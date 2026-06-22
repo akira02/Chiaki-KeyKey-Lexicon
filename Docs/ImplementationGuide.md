@@ -1,6 +1,6 @@
-# AI Implementation Guide
+# Implementation Guide
 
-This document is written for the next AI or engineer implementing Chiaki KeyKey's lexicon update pipeline.
+This document is written for the next engineer or maintainer implementing Chiaki KeyKey's lexicon update pipeline.
 
 ## Objective
 
@@ -51,7 +51,7 @@ Recommended layout:
 
 ```text
 Docs/
-  AIImplementationGuide.md
+  ImplementationGuide.md
   SourceReview.md
 LICENSES/
   README.md

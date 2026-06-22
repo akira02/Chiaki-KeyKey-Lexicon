@@ -27,13 +27,13 @@ The main app repository should stay focused on the macOS input method runtime, d
 
 This repository is a scaffold. It does not yet publish a production lexicon.
 
-The next implementation agent should start with [Docs/AIImplementationGuide.md](Docs/AIImplementationGuide.md).
+The next implementer should start with [Docs/ImplementationGuide.md](Docs/ImplementationGuide.md).
 
 ## Proposed Layout
 
 ```text
 Docs/
-  AIImplementationGuide.md
+  ImplementationGuide.md
 LICENSES/
   README.md
 manifests/
