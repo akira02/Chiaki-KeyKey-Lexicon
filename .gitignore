@@ -11,6 +11,7 @@ target/
 dist/
 release-artifacts/
 *.db
+!sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db
 *.sqlite
 *.sqlite3
 *.db-shm

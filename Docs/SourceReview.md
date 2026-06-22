@@ -7,14 +7,21 @@ Last reviewed: 2026-06-22
 ### keykey-boneyard-bootstrap
 
 - Name: KeyKey Boneyard bootstrap data
-- Local source: `../KeyKey-Boneyard/YahooKeyKey-Source-1.1.2528`
+- Local release input: `sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db`
 - Upstream archive: <https://github.com/vChewing/KeyKey-Boneyard>
 - Current fork note: <https://github.com/akira02/Chiaki-KeyKey>
 - License: BSD-3-Clause-style Yahoo! KeyKey upstream license
 - Attribution: Yahoo! Inc., OpenVanilla contributors, KeyKey Boneyard / Chiaki KeyKey maintainers
 - Redistribution decision: included for the first public seed release
 
-The source files used for v1 are limited to the redistributable bootstrap database inputs:
+This repository vendors only the cooked bootstrap database needed by the release builder:
+
+```text
+sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db
+sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db.sha256
+```
+
+The source files used to produce that bootstrap database are limited to the redistributable KeyKey Boneyard inputs:
 
 - `YahooKeyKey-Source-1.1.2528/DataTables/bpmf.cin`
 - `YahooKeyKey-Source-1.1.2528/Distributions/Takao/DataSource/Addendum/*.txt`
@@ -28,6 +35,8 @@ sources/keykey-boneyard-bootstrap/source-inventory.sha256
 ```
 
 The manifest records the SHA-256 of that inventory file, not a single raw upstream archive.
+
+`source-inventory.sha256` is kept as provenance for the vendored cooked database. The full KeyKey Boneyard tree is not copied into this repository.
 
 ## Excluded from v1
 

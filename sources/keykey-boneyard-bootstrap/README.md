@@ -1,28 +1,39 @@
 # KeyKey Boneyard Bootstrap Source
 
-This source entry documents the first Chiaki KeyKey Lexicon seed release.
+這個來源是 Chiaki KeyKey Lexicon 的基礎 bootstrap 層。
 
-The raw files are not copied into this repository. They are read from a local checkout of:
+為了讓 CI 與 release build 不依賴本機的 `../KeyKey-Boneyard` checkout，repo 內保留一份已知可用的 cooked database：
 
 ```text
-../KeyKey-Boneyard/YahooKeyKey-Source-1.1.2528
+sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db
 ```
 
-Run the release preparation script from the repository root:
+對應的資料庫 SHA-256 記錄在：
+
+```text
+sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db.sha256
+```
+
+`source-inventory.sha256` 則保留當初產生這份 cooked database 時使用的 KeyKey Boneyard upstream 檔案清單與 SHA-256。也就是說：
+
+1. `vendor/KeyKeySource.db` 是 release builder 的實際 bootstrap 輸入。
+2. `source-inventory.sha256` 是這份 bootstrap DB 的來源 provenance。
+3. `KeyKey-Boneyard` 的完整歷史原始資料不複製進這個 repo。
+
+從 repository root 執行 release build：
 
 ```sh
 cargo run --release -- prepare-release
 ```
 
-The script expects `../KeyKey-Boneyard` by default. Override it with:
+預設會使用 vendored bootstrap DB。若要在本機測試其他 bootstrap DB，可以用 `BONEYARD_DB` override：
 
 ```sh
-KEYKEY_BONEYARD_ROOT=/path/to/KeyKey-Boneyard cargo run --release -- prepare-release
+BONEYARD_DB=/path/to/KeyKeySource.db cargo run --release -- prepare-release
 ```
 
-The script writes:
+建置會寫出：
 
-- `sources/keykey-boneyard-bootstrap/source-inventory.sha256`
 - `normalized/smart-mandarin.tsv`
 - `manifests/lexicon-manifest.json`
 - `dist/<version>/KeyKeySource-<version>.db`

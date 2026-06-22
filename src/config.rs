@@ -6,6 +6,8 @@ use std::path::PathBuf;
 
 pub const BONEYARD_SOURCE_ID: &str = "keykey-boneyard-bootstrap";
 pub const BONEYARD_SOURCE_NAME: &str = "KeyKey Boneyard bootstrap data";
+pub const BONEYARD_VENDOR_DB_PATH: &str =
+    "sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db";
 pub const LIBCHEWING_SOURCE_ID: &str = "libchewing-data";
 pub const LIBCHEWING_SOURCE_NAME: &str = "libchewing-data Traditional Chinese Zhuyin dictionary";
 pub const RIME_ESSAY_SOURCE_ID: &str = "rime-essay";
@@ -49,8 +51,6 @@ pub const DOWNLOADS: &[SourceDownload] = &[
 
 pub struct Config {
     pub root: PathBuf,
-    pub boneyard_root: PathBuf,
-    pub boneyard_source_root: PathBuf,
     pub boneyard_db: PathBuf,
     pub release_version: String,
     pub language_model_version: String,
@@ -66,7 +66,7 @@ pub struct Config {
 
 pub fn load() -> Result<Config> {
     let root = env::current_dir().context("read current directory")?;
-    let release_version = env_or("LEXICON_VERSION", "2026.06.3");
+    let release_version = env_or("LEXICON_VERSION", "2026.06.4");
     let language_model_version = format!("chiaki-modern-{release_version}");
     let minimum_app_version = env_or("MINIMUM_APP_VERSION", "0.1.0");
     let generated_at = env::var("GENERATED_AT")
@@ -83,12 +83,22 @@ pub fn load() -> Result<Config> {
     let rime_essay_min_score = env_or("RIME_ESSAY_MIN_SCORE", "40")
         .parse()
         .context("parse RIME_ESSAY_MIN_SCORE")?;
-    let boneyard_root = env::var("KEYKEY_BONEYARD_ROOT")
+    let legacy_boneyard_root = env::var("KEYKEY_BONEYARD_ROOT")
         .map(PathBuf::from)
         .unwrap_or_else(|_| root.join("..").join("KeyKey-Boneyard"));
-    let boneyard_source_root = boneyard_root.join("YahooKeyKey-Source-1.1.2528");
-    let boneyard_db =
-        boneyard_source_root.join("Distributions/Takao/CookedDatabase/KeyKeySource.db");
+    let legacy_boneyard_db = legacy_boneyard_root
+        .join("YahooKeyKey-Source-1.1.2528")
+        .join("Distributions/Takao/CookedDatabase/KeyKeySource.db");
+    let boneyard_db = env::var("BONEYARD_DB")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let vendored = root.join(BONEYARD_VENDOR_DB_PATH);
+            if vendored.is_file() {
+                vendored
+            } else {
+                legacy_boneyard_db
+            }
+        });
     let dist_dir = env::var("DIST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| root.join("dist").join(&release_version));
@@ -101,8 +111,6 @@ pub fn load() -> Result<Config> {
 
     Ok(Config {
         root,
-        boneyard_root,
-        boneyard_source_root,
         boneyard_db,
         release_version,
         language_model_version,

@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::types::FileInfo;
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
@@ -6,17 +5,6 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-
-pub fn boneyard_source_files(cfg: &Config) -> Vec<PathBuf> {
-    let data_source = cfg
-        .boneyard_source_root
-        .join("Distributions/Takao/DataSource");
-    let mut files = vec![cfg.boneyard_source_root.join("DataTables/bpmf.cin")];
-    files.extend(glob_dir(&data_source.join("Addendum"), "txt"));
-    files.extend(glob_dir(&data_source.join("Overrides"), "txt"));
-    files.extend(glob_dir(&data_source.join("Modern"), "txt"));
-    files
-}
 
 pub fn verify_required_files(paths: &[PathBuf]) -> Result<()> {
     let missing = paths
@@ -135,18 +123,6 @@ pub fn relative_to(path: &Path, root: &Path) -> Result<String> {
         .join("/"))
 }
 
-pub fn repo_relative(cfg: &Config, path: &Path) -> Result<String> {
-    relative_to(path, &cfg.root)
-}
-
-fn glob_dir(dir: &Path, extension: &str) -> Vec<PathBuf> {
-    let mut files = fs::read_dir(dir)
-        .ok()
-        .into_iter()
-        .flat_map(|entries| entries.filter_map(|entry| entry.ok()))
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some(extension))
-        .collect::<Vec<_>>();
-    files.sort();
-    files
+pub fn repo_relative(root: &Path, path: &Path) -> Result<String> {
+    relative_to(path, root)
 }

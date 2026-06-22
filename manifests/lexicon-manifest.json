@@ -1,85 +1,85 @@
 {
-  "schema": 1,
-  "version": "2026.06.3",
-  "generated_at": "2026-06-22T08:47:31Z",
-  "minimum_app_version": "0.1.0",
-  "database_schema_version": 1,
-  "sources": [
-    {
-      "id": "keykey-boneyard-bootstrap",
-      "name": "KeyKey Boneyard bootstrap data",
-      "url": "https://github.com/vChewing/KeyKey-Boneyard",
-      "format": "sqlite",
-      "license": "BSD-3-Clause-style",
-      "attribution": "Yahoo! Inc.; OpenVanilla contributors; KeyKey Boneyard / Chiaki KeyKey maintainers",
-      "sha256": "175bec368615dc219e76c8d4941e96054126500dae1d9b4737559f3413a085ab",
-      "enabled": true,
-      "priority": 100
-    },
-    {
-      "id": "libchewing-data",
-      "name": "libchewing-data Traditional Chinese Zhuyin dictionary",
-      "url": "https://github.com/chewing/libchewing-data/releases/tag/v2026.3.22",
-      "format": "csv",
-      "license": "LGPL-2.1-or-later",
-      "attribution": "libchewing Core Team",
-      "sha256": "728cee6d45c0f63647ed4c1f03d8301f34ad0e95d31ce559f87bca7760d75c52",
-      "enabled": true,
-      "priority": 250
-    },
-    {
-      "id": "rime-essay",
-      "name": "Rime essay shared vocabulary and language model",
-      "url": "https://github.com/rime/rime-essay/tree/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed",
-      "format": "text",
-      "license": "LGPL-3.0",
-      "attribution": "Rime essay contributors",
-      "sha256": "f485f22422809caaf48c6df7fe276614861ca8916a37b8af7c62b68fe46c9557",
-      "enabled": true,
-      "priority": 220
-    },
-    {
-      "id": "chiaki-modern-overlay",
-      "name": "Chiaki modern overlay phrases",
-      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/blob/main/sources/chiaki-modern-overlay/phrases.tsv",
-      "format": "tsv",
-      "license": "CC0-1.0",
-      "attribution": "Chiaki KeyKey Lexicon maintainers",
-      "sha256": "1f4f57794cdfeeb598d3c67f457430663e90686d68f712f3d8afaa25c7bf667b",
-      "enabled": true,
-      "priority": 300
-    }
-  ],
   "artifacts": [
     {
+      "database_schema_version": 1,
+      "filename": "KeyKeySource-2026.06.4.db",
       "id": "smart-mandarin-db",
       "kind": "keykey-source-db",
-      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.3/KeyKeySource-2026.06.3.db",
-      "filename": "KeyKeySource-2026.06.3.db",
-      "sha256": "b99f5b4ea3b6076ecad1eff0a14a5c4408b95c0d953c97bc7c18121c7acab505",
-      "size": 44965888,
-      "database_schema_version": 1,
-      "language_model_version": "chiaki-modern-2026.06.3"
+      "language_model_version": "chiaki-modern-2026.06.4",
+      "sha256": "3baee99c52af7e6b64aaf0159d1c154b961f3b9f51ff70afb7ab6198961a76a5",
+      "size": 44515328,
+      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.4/KeyKeySource-2026.06.4.db"
     },
     {
+      "database_schema_version": 1,
+      "filename": "KeyKeySource-2026.06.4.json",
       "id": "smart-mandarin-metadata",
       "kind": "metadata",
-      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.3/KeyKeySource-2026.06.3.json",
-      "filename": "KeyKeySource-2026.06.3.json",
-      "sha256": "59d724be663546d20e351e4e69107f8548026925cf4e404de7fe8a4f8564846a",
-      "size": 14144,
-      "database_schema_version": 1,
-      "language_model_version": "chiaki-modern-2026.06.3"
+      "language_model_version": "chiaki-modern-2026.06.4",
+      "sha256": "a8dfbedd66ed11e3b6ac0223289bf04a3299c001f97040680d1c895bbd4a711a",
+      "size": 14153,
+      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.4/KeyKeySource-2026.06.4.json"
     },
     {
+      "database_schema_version": 1,
+      "filename": "SHA256SUMS",
       "id": "smart-mandarin-checksums",
       "kind": "checksum",
-      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.3/SHA256SUMS",
-      "filename": "SHA256SUMS",
-      "sha256": "cae18718c4981c7b687260ea1ced3cd83956407415ca0194f6395122f6b5b8b1",
+      "language_model_version": "chiaki-modern-2026.06.4",
+      "sha256": "7c59c92f69ac88461b859fd8e809464006817ed022afead9739c15336587a53a",
       "size": 186,
-      "database_schema_version": 1,
-      "language_model_version": "chiaki-modern-2026.06.3"
+      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.4/SHA256SUMS"
     }
-  ]
+  ],
+  "database_schema_version": 1,
+  "generated_at": "2026-06-22T09:36:05Z",
+  "minimum_app_version": "0.1.0",
+  "schema": 1,
+  "sources": [
+    {
+      "attribution": "Yahoo! Inc.; OpenVanilla contributors; KeyKey Boneyard / Chiaki KeyKey maintainers",
+      "enabled": true,
+      "format": "sqlite",
+      "id": "keykey-boneyard-bootstrap",
+      "license": "BSD-3-Clause-style",
+      "name": "KeyKey Boneyard bootstrap data",
+      "priority": 100,
+      "sha256": "175bec368615dc219e76c8d4941e96054126500dae1d9b4737559f3413a085ab",
+      "url": "https://github.com/vChewing/KeyKey-Boneyard"
+    },
+    {
+      "attribution": "libchewing Core Team",
+      "enabled": true,
+      "format": "csv",
+      "id": "libchewing-data",
+      "license": "LGPL-2.1-or-later",
+      "name": "libchewing-data Traditional Chinese Zhuyin dictionary",
+      "priority": 250,
+      "sha256": "728cee6d45c0f63647ed4c1f03d8301f34ad0e95d31ce559f87bca7760d75c52",
+      "url": "https://github.com/chewing/libchewing-data/releases/tag/v2026.3.22"
+    },
+    {
+      "attribution": "Rime essay contributors",
+      "enabled": true,
+      "format": "text",
+      "id": "rime-essay",
+      "license": "LGPL-3.0",
+      "name": "Rime essay shared vocabulary and language model",
+      "priority": 220,
+      "sha256": "f485f22422809caaf48c6df7fe276614861ca8916a37b8af7c62b68fe46c9557",
+      "url": "https://github.com/rime/rime-essay/tree/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed"
+    },
+    {
+      "attribution": "Chiaki KeyKey Lexicon maintainers",
+      "enabled": true,
+      "format": "tsv",
+      "id": "chiaki-modern-overlay",
+      "license": "CC0-1.0",
+      "name": "Chiaki modern overlay phrases",
+      "priority": 300,
+      "sha256": "1f4f57794cdfeeb598d3c67f457430663e90686d68f712f3d8afaa25c7bf667b",
+      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/blob/main/sources/chiaki-modern-overlay/phrases.tsv"
+    }
+  ],
+  "version": "2026.06.4"
 }

@@ -1,8 +1,8 @@
 use crate::config::{self, Config};
 use crate::db;
 use crate::files::{
-    boneyard_source_files, file_info, repo_relative, sha256_file, verify_required_files,
-    write_inventory, write_json, write_text,
+    file_info, repo_relative, sha256_file, verify_required_files, write_inventory, write_json,
+    write_text,
 };
 use crate::importers;
 use crate::manifest;
@@ -18,11 +18,10 @@ pub fn run() -> Result<()> {
     let cfg = config::load()?;
     let paths = ReleasePaths::new(&cfg);
     let libchewing_files = config::libchewing_files(&cfg);
-    let source_files = boneyard_source_files(&cfg);
 
-    verify_inputs(&cfg, &paths, &source_files, &libchewing_files)?;
+    verify_inputs(&cfg, &paths, &libchewing_files)?;
     create_output_dirs(&cfg, &paths)?;
-    write_source_inventories(&cfg, &paths, &source_files, &libchewing_files)?;
+    write_source_inventories(&paths, &libchewing_files)?;
 
     fs::copy(&cfg.boneyard_db, &paths.db).with_context(|| {
         format!(
@@ -99,15 +98,14 @@ pub fn run() -> Result<()> {
 fn verify_inputs(
     cfg: &Config,
     paths: &ReleasePaths,
-    source_files: &[std::path::PathBuf],
     libchewing_files: &[crate::types::LibchewingFile],
 ) -> Result<()> {
     let mut required = vec![
         cfg.boneyard_db.clone(),
+        paths.boneyard_inventory.clone(),
         paths.overlay_phrases.clone(),
         paths.rime_essay_raw.clone(),
     ];
-    required.extend(source_files.iter().cloned());
     required.extend(libchewing_files.iter().map(|entry| entry.path.clone()));
     verify_required_files(&required)
 }
@@ -125,17 +123,9 @@ fn create_output_dirs(cfg: &Config, paths: &ReleasePaths) -> Result<()> {
 }
 
 fn write_source_inventories(
-    cfg: &Config,
     paths: &ReleasePaths,
-    source_files: &[std::path::PathBuf],
     libchewing_files: &[crate::types::LibchewingFile],
 ) -> Result<()> {
-    write_inventory(
-        &paths.boneyard_inventory,
-        &cfg.boneyard_root,
-        source_files,
-        false,
-    )?;
     let libchewing_paths = libchewing_files
         .iter()
         .map(|entry| entry.path.clone())
@@ -179,7 +169,7 @@ fn import_libchewing(
         let result = db::apply_records(
             conn,
             records,
-            &repo_relative(cfg, &entry.path)?,
+            &repo_relative(&cfg.root, &entry.path)?,
             entry.kind,
             &sha256_file(&entry.path)?,
             seen,
@@ -210,7 +200,7 @@ fn import_rime(
     let result = db::apply_records(
         conn,
         records,
-        &repo_relative(cfg, &paths.rime_essay_raw)?,
+        &repo_relative(&cfg.root, &paths.rime_essay_raw)?,
         "rime-supplement",
         &sha256_file(&paths.rime_essay_raw)?,
         seen,
@@ -235,7 +225,7 @@ fn import_overlay(
     let result = db::apply_records(
         conn,
         records,
-        &repo_relative(cfg, &paths.overlay_phrases)?,
+        &repo_relative(&cfg.root, &paths.overlay_phrases)?,
         "overlay",
         &sha256_file(&paths.overlay_phrases)?,
         seen,
