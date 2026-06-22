@@ -11,13 +11,13 @@ The raw files are not copied into this repository. They are read from a local ch
 Run the release preparation script from the repository root:
 
 ```sh
-Scripts/prepare-v1-release.rb
+cargo run --release -- prepare-release
 ```
 
 The script expects `../KeyKey-Boneyard` by default. Override it with:
 
 ```sh
-KEYKEY_BONEYARD_ROOT=/path/to/KeyKey-Boneyard Scripts/prepare-v1-release.rb
+KEYKEY_BONEYARD_ROOT=/path/to/KeyKey-Boneyard cargo run --release -- prepare-release
 ```
 
 The script writes:
@@ -29,4 +29,3 @@ The script writes:
 - `dist/<version>/KeyKeySource-<version>.json`
 - `dist/<version>/lexicon-manifest.json`
 - `dist/<version>/SHA256SUMS`
-

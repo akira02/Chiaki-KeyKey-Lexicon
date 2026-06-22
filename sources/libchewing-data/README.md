@@ -13,7 +13,7 @@ Pinned upstream files:
 Local raw files are downloaded to `sources/libchewing-data/raw/` by:
 
 ```sh
-Scripts/fetch-modern-sources.rb
+cargo run --release -- fetch-modern-sources
 ```
 
 The raw files are intentionally not tracked in git. Their checksums are recorded in `source-inventory.sha256`.

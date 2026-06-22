@@ -37,13 +37,13 @@ Start with:
 Fetch pinned external source files with:
 
 ```sh
-Scripts/fetch-modern-sources.rb
+cargo run --release -- fetch-modern-sources
 ```
 
 Then build the local release package with:
 
 ```sh
-Scripts/prepare-v1-release.rb
+cargo run --release -- prepare-release
 ```
 
 ## Proposed Layout
@@ -53,6 +53,8 @@ Docs/
   ImplementationGuide.md
 LICENSES/
   README.md
+src/
+  main.rs
 manifests/
   lexicon-manifest.example.json
 normalized/

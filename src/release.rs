@@ -1,0 +1,288 @@
+use crate::config::{self, Config};
+use crate::db;
+use crate::files::{
+    boneyard_source_files, file_info, repo_relative, sha256_file, verify_required_files,
+    write_inventory, write_json, write_text,
+};
+use crate::importers;
+use crate::manifest;
+use crate::paths::ReleasePaths;
+use crate::types::{ImportResult, SourceRecord};
+use anyhow::{Context, Result};
+use rusqlite::Connection;
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs;
+
+pub fn run() -> Result<()> {
+    let cfg = config::load()?;
+    let paths = ReleasePaths::new(&cfg);
+    let libchewing_files = config::libchewing_files(&cfg);
+    let source_files = boneyard_source_files(&cfg);
+
+    verify_inputs(&cfg, &paths, &source_files, &libchewing_files)?;
+    create_output_dirs(&cfg, &paths)?;
+    write_source_inventories(&cfg, &paths, &source_files, &libchewing_files)?;
+
+    fs::copy(&cfg.boneyard_db, &paths.db).with_context(|| {
+        format!(
+            "copy {} to {}",
+            cfg.boneyard_db.display(),
+            paths.db.display()
+        )
+    })?;
+    let mut conn = Connection::open(&paths.db)?;
+    let mut source_keys: HashMap<(String, String), SourceRecord> = HashMap::new();
+    let mut import_results = Vec::new();
+
+    import_libchewing(
+        &mut conn,
+        &cfg,
+        &libchewing_files,
+        &mut source_keys,
+        &mut import_results,
+    )?;
+    import_rime(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
+    import_overlay(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
+
+    db::refresh_metadata_counts(&conn)?;
+    db::update_release_metadata_rows(&conn, &cfg)?;
+    db::write_normalized(&conn, &cfg.normalized_path, &source_keys)?;
+
+    let metadata = db::db_metadata(&conn)?;
+    let source_rows = db::db_source_rows(&conn)?;
+    let counts = db::db_counts(&conn, &cfg.normalized_path, &metadata)?;
+    drop(conn);
+
+    let db_info = file_info(&paths.db)?;
+    let normalized_info = file_info(&cfg.normalized_path)?;
+    let release_metadata = manifest::release_metadata(
+        &cfg,
+        &paths,
+        &metadata,
+        &counts,
+        &source_rows,
+        &db_info,
+        &normalized_info,
+    )?;
+    write_json(&paths.metadata, &release_metadata)?;
+    let metadata_info = file_info(&paths.metadata)?;
+
+    write_text(
+        &paths.checksum,
+        &format!(
+            "{}  {}\n{}  {}\n",
+            db_info.sha256, paths.db_filename, metadata_info.sha256, paths.metadata_filename
+        ),
+    )?;
+    let checksum_info = file_info(&paths.checksum)?;
+    let manifest_json = manifest::manifest(&cfg, &paths, &db_info, &metadata_info, &checksum_info)?;
+    write_json(&cfg.manifest_path, &manifest_json)?;
+    fs::copy(&cfg.manifest_path, &paths.dist_manifest)?;
+
+    print_summary(&cfg, &paths, &counts, &import_results);
+    Ok(())
+}
+
+fn verify_inputs(
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_files: &[std::path::PathBuf],
+    libchewing_files: &[crate::types::LibchewingFile],
+) -> Result<()> {
+    let mut required = vec![
+        cfg.boneyard_db.clone(),
+        paths.overlay_phrases.clone(),
+        paths.rime_essay_raw.clone(),
+    ];
+    required.extend(source_files.iter().cloned());
+    required.extend(libchewing_files.iter().map(|entry| entry.path.clone()));
+    verify_required_files(&required)
+}
+
+fn create_output_dirs(cfg: &Config, paths: &ReleasePaths) -> Result<()> {
+    fs::create_dir_all(&cfg.dist_dir)?;
+    if let Some(parent) = cfg.normalized_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::create_dir_all(&paths.boneyard_source_dir)?;
+    fs::create_dir_all(&paths.libchewing_source_dir)?;
+    fs::create_dir_all(&paths.rime_essay_source_dir)?;
+    fs::create_dir_all(&paths.overlay_source_dir)?;
+    Ok(())
+}
+
+fn write_source_inventories(
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_files: &[std::path::PathBuf],
+    libchewing_files: &[crate::types::LibchewingFile],
+) -> Result<()> {
+    write_inventory(
+        &paths.boneyard_inventory,
+        &cfg.boneyard_root,
+        source_files,
+        false,
+    )?;
+    let libchewing_paths = libchewing_files
+        .iter()
+        .map(|entry| entry.path.clone())
+        .collect::<Vec<_>>();
+    write_inventory(
+        &paths.libchewing_inventory,
+        &paths.libchewing_source_dir,
+        &libchewing_paths,
+        true,
+    )?;
+    write_inventory(
+        &paths.rime_essay_inventory,
+        &paths.rime_essay_source_dir,
+        std::slice::from_ref(&paths.rime_essay_raw),
+        true,
+    )
+}
+
+fn import_libchewing(
+    conn: &mut Connection,
+    cfg: &Config,
+    files: &[crate::types::LibchewingFile],
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let phrase_paths = files
+        .iter()
+        .filter(|entry| entry.min_codepoints >= 2)
+        .map(|entry| entry.path.clone())
+        .collect::<Vec<_>>();
+    let max_score = importers::libchewing_max_score(&phrase_paths)?;
+
+    for entry in files {
+        let existing_exact_keys = if entry.min_codepoints == 1 {
+            Some(db::load_existing_exact_keys(conn)?)
+        } else {
+            None
+        };
+        let (records, seen, skipped) =
+            importers::parse_libchewing_csv(entry, max_score, existing_exact_keys.as_ref())?;
+        let result = db::apply_records(
+            conn,
+            records,
+            &repo_relative(cfg, &entry.path)?,
+            entry.kind,
+            &sha256_file(&entry.path)?,
+            seen,
+            skipped,
+            entry.replace_phrases,
+        )?;
+        remember_records(source_keys, &result);
+        import_results.push(result);
+    }
+    Ok(())
+}
+
+fn import_rime(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let char_readings = db::load_primary_character_readings(conn)?;
+    let existing_phrases = db::load_existing_phrases(conn)?;
+    let (records, seen, skipped) = importers::parse_rime_essay(
+        &paths.rime_essay_raw,
+        cfg,
+        &char_readings,
+        &existing_phrases,
+    )?;
+    let result = db::apply_records(
+        conn,
+        records,
+        &repo_relative(cfg, &paths.rime_essay_raw)?,
+        "rime-supplement",
+        &sha256_file(&paths.rime_essay_raw)?,
+        seen,
+        skipped,
+        false,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_overlay(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, parse_skipped) = importers::parse_overlay(&paths.overlay_phrases, cfg)?;
+    let (records, infer_skipped) =
+        importers::infer_overlay_qstrings(records, &db::load_primary_character_readings(conn)?);
+    let result = db::apply_records(
+        conn,
+        records,
+        &repo_relative(cfg, &paths.overlay_phrases)?,
+        "overlay",
+        &sha256_file(&paths.overlay_phrases)?,
+        seen,
+        parse_skipped + infer_skipped,
+        true,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn remember_records(
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    result: &ImportResult,
+) {
+    for record in &result.records {
+        source_keys.insert(
+            (record.qstring.clone(), record.phrase.clone()),
+            record.clone(),
+        );
+    }
+}
+
+fn print_summary(
+    cfg: &Config,
+    paths: &ReleasePaths,
+    counts: &Value,
+    import_results: &[ImportResult],
+) {
+    println!("Prepared Chiaki KeyKey Lexicon {}", cfg.release_version);
+    println!("  DB: {}", paths.db.display());
+    println!("  Metadata: {}", paths.metadata.display());
+    println!("  Manifest: {}", cfg.manifest_path.display());
+    println!("  Checksums: {}", paths.checksum.display());
+    println!(
+        "  Normalized TSV: {} ({} rows)",
+        cfg.normalized_path.display(),
+        counts
+            .get("normalized_rows")
+            .and_then(Value::as_i64)
+            .unwrap_or_default()
+    );
+    println!("  Imported:");
+    for result in import_results {
+        println!(
+            "    {}: seen={} added={} skipped={}",
+            result.source_path, result.seen, result.added, result.skipped
+        );
+    }
+}

@@ -1,0 +1,225 @@
+use crate::config::{
+    Config, BONEYARD_SOURCE_ID, BONEYARD_SOURCE_NAME, DATABASE_SCHEMA_VERSION,
+    LIBCHEWING_SOURCE_ID, LIBCHEWING_SOURCE_NAME, OVERLAY_SOURCE_ID, OVERLAY_SOURCE_NAME,
+    RIME_ESSAY_SOURCE_ID, RIME_ESSAY_SOURCE_NAME,
+};
+use crate::db;
+use crate::files::{file_info, sha256_file};
+use crate::paths::ReleasePaths;
+use crate::types::FileInfo;
+use anyhow::Result;
+use serde_json::{json, Value};
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
+
+pub fn release_metadata(
+    cfg: &Config,
+    paths: &ReleasePaths,
+    metadata: &BTreeMap<String, Value>,
+    counts: &Value,
+    source_rows: &[Value],
+    db_info: &FileInfo,
+    normalized_info: &FileInfo,
+) -> Result<Value> {
+    let sources = vec![
+        release_source(
+            BONEYARD_SOURCE_ID,
+            BONEYARD_SOURCE_NAME,
+            "BSD-3-Clause-style",
+            "Yahoo! Inc.; OpenVanilla contributors; KeyKey Boneyard / Chiaki KeyKey maintainers",
+            &paths.boneyard_inventory,
+            db::stats_for_source_rows(source_rows, "YahooKeyKey-Source-1.1.2528/"),
+        )?,
+        release_source(
+            LIBCHEWING_SOURCE_ID,
+            LIBCHEWING_SOURCE_NAME,
+            "LGPL-2.1-or-later",
+            "libchewing Core Team",
+            &paths.libchewing_inventory,
+            db::stats_for_source_rows(source_rows, "sources/libchewing-data/raw/"),
+        )?,
+        release_source(
+            RIME_ESSAY_SOURCE_ID,
+            RIME_ESSAY_SOURCE_NAME,
+            "LGPL-3.0",
+            "Rime essay contributors",
+            &paths.rime_essay_inventory,
+            db::stats_for_source_rows(source_rows, "sources/rime-essay/raw/"),
+        )?,
+        json!({
+            "id": OVERLAY_SOURCE_ID,
+            "name": OVERLAY_SOURCE_NAME,
+            "license": "CC0-1.0",
+            "attribution": "Chiaki KeyKey Lexicon maintainers",
+            "path": "sources/chiaki-modern-overlay/phrases.tsv",
+            "sha256": sha256_file(&paths.overlay_phrases)?,
+            "size": fs::metadata(&paths.overlay_phrases)?.len(),
+            "stats": db::stats_for_source_rows(source_rows, "sources/chiaki-modern-overlay/phrases.tsv")
+        }),
+    ];
+
+    Ok(json!({
+        "schema": 1,
+        "version": cfg.release_version,
+        "generated_at": cfg.generated_at,
+        "language_model_version": cfg.language_model_version,
+        "database_schema_version": DATABASE_SCHEMA_VERSION,
+        "database": {
+            "filename": paths.db_filename,
+            "sha256": db_info.sha256,
+            "size": db_info.size,
+            "metadata": metadata,
+            "counts": counts
+        },
+        "normalized": {
+            "path": "normalized/smart-mandarin.tsv",
+            "sha256": normalized_info.sha256,
+            "size": normalized_info.size,
+            "rows": counts.get("normalized_rows").and_then(Value::as_i64).unwrap_or_default(),
+            "format": "reading<TAB>phrase<TAB>weight<TAB>source_id<TAB>tags"
+        },
+        "sources": sources
+    }))
+}
+
+pub fn manifest(
+    cfg: &Config,
+    paths: &ReleasePaths,
+    db_info: &FileInfo,
+    metadata_info: &FileInfo,
+    checksum_info: &FileInfo,
+) -> Result<Value> {
+    let sources = vec![
+        manifest_source(
+            BONEYARD_SOURCE_ID,
+            BONEYARD_SOURCE_NAME,
+            "https://github.com/vChewing/KeyKey-Boneyard",
+            "sqlite",
+            "BSD-3-Clause-style",
+            "Yahoo! Inc.; OpenVanilla contributors; KeyKey Boneyard / Chiaki KeyKey maintainers",
+            &paths.boneyard_inventory,
+            100,
+        )?,
+        manifest_source(
+            LIBCHEWING_SOURCE_ID,
+            LIBCHEWING_SOURCE_NAME,
+            "https://github.com/chewing/libchewing-data/releases/tag/v2026.3.22",
+            "csv",
+            "LGPL-2.1-or-later",
+            "libchewing Core Team",
+            &paths.libchewing_inventory,
+            250,
+        )?,
+        manifest_source(
+            RIME_ESSAY_SOURCE_ID,
+            RIME_ESSAY_SOURCE_NAME,
+            "https://github.com/rime/rime-essay/tree/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed",
+            "text",
+            "LGPL-3.0",
+            "Rime essay contributors",
+            &paths.rime_essay_inventory,
+            220,
+        )?,
+        json!({
+            "id": OVERLAY_SOURCE_ID,
+            "name": OVERLAY_SOURCE_NAME,
+            "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/blob/main/sources/chiaki-modern-overlay/phrases.tsv",
+            "format": "tsv",
+            "license": "CC0-1.0",
+            "attribution": "Chiaki KeyKey Lexicon maintainers",
+            "sha256": sha256_file(&paths.overlay_phrases)?,
+            "enabled": true,
+            "priority": 300
+        }),
+    ];
+
+    Ok(json!({
+        "schema": 1,
+        "version": cfg.release_version,
+        "generated_at": cfg.generated_at,
+        "minimum_app_version": cfg.minimum_app_version,
+        "database_schema_version": DATABASE_SCHEMA_VERSION,
+        "sources": sources,
+        "artifacts": [
+            artifact_json("smart-mandarin-db", "keykey-source-db", &cfg.release_base_url, &paths.db_filename, db_info, &cfg.language_model_version),
+            artifact_json("smart-mandarin-metadata", "metadata", &cfg.release_base_url, &paths.metadata_filename, metadata_info, &cfg.language_model_version),
+            artifact_json("smart-mandarin-checksums", "checksum", &cfg.release_base_url, "SHA256SUMS", checksum_info, &cfg.language_model_version)
+        ]
+    }))
+}
+
+fn release_source(
+    id: &str,
+    name: &str,
+    license: &str,
+    attribution: &str,
+    inventory_path: &Path,
+    stats: Vec<Value>,
+) -> Result<Value> {
+    let info = file_info(inventory_path)?;
+    Ok(json!({
+        "id": id,
+        "name": name,
+        "license": license,
+        "attribution": attribution,
+        "inventory": {
+            "path": repo_inventory_path(inventory_path),
+            "sha256": info.sha256,
+            "size": info.size
+        },
+        "stats": stats
+    }))
+}
+
+fn manifest_source(
+    id: &str,
+    name: &str,
+    url: &str,
+    format: &str,
+    license: &str,
+    attribution: &str,
+    inventory_path: &Path,
+    priority: i64,
+) -> Result<Value> {
+    Ok(json!({
+        "id": id,
+        "name": name,
+        "url": url,
+        "format": format,
+        "license": license,
+        "attribution": attribution,
+        "sha256": sha256_file(inventory_path)?,
+        "enabled": true,
+        "priority": priority
+    }))
+}
+
+fn artifact_json(
+    id: &str,
+    kind: &str,
+    release_base_url: &str,
+    filename: &str,
+    info: &FileInfo,
+    language_model_version: &str,
+) -> Value {
+    json!({
+        "id": id,
+        "kind": kind,
+        "url": format!("{release_base_url}/{filename}"),
+        "filename": filename,
+        "sha256": info.sha256,
+        "size": info.size,
+        "database_schema_version": DATABASE_SCHEMA_VERSION,
+        "language_model_version": language_model_version
+    })
+}
+
+fn repo_inventory_path(path: &Path) -> String {
+    let parts = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    let start = parts.iter().position(|part| part == "sources").unwrap_or(0);
+    parts[start..].join("/")
+}

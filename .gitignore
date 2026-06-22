@@ -5,6 +5,7 @@ sources/**/raw/*
 !sources/**/raw/.gitkeep
 Build/
 tmp/
+target/
 
 # Local release staging. Final artifacts should be uploaded to GitHub Releases.
 dist/

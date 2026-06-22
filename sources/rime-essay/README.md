@@ -11,7 +11,7 @@ Pinned upstream file:
 Local raw files are downloaded to `sources/rime-essay/raw/` by:
 
 ```sh
-Scripts/fetch-modern-sources.rb
+cargo run --release -- fetch-modern-sources
 ```
 
 The raw file is intentionally not tracked in git. Its checksum is recorded in `source-inventory.sha256`.

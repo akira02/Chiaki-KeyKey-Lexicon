@@ -75,7 +75,7 @@ The release builder imports these pinned files:
 The raw files are fetched by:
 
 ```text
-Scripts/fetch-modern-sources.rb
+cargo run --release -- fetch-modern-sources
 ```
 
 The generated source inventory is stored at:
