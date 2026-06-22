@@ -88,6 +88,8 @@ Runtime database loading should fall back to the bundled database if the active 
 
 ## License Policy
 
+Rust release tooling and repository scripts are licensed under the MIT License; see [LICENSE-CODE](LICENSE-CODE).
+
 There is no repository-wide data license yet.
 
 Every source must declare its own license before it can be used in a public release. Unknown-license data may be used only for local experiments and must not be included in release artifacts.

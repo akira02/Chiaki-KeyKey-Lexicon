@@ -1,6 +1,8 @@
 # License Notes
 
-This repository does not yet declare a single license for all lexicon data.
+The Rust release tooling and repository scripts are licensed under the MIT License; see [LICENSE-CODE](../LICENSE-CODE).
+
+This repository does not declare a single license for all lexicon data.
 
 Each source must document:
 
@@ -44,4 +46,4 @@ Unknown-license data must not be included in public release artifacts.
 - Review notes: [Docs/SourceReview.md](../Docs/SourceReview.md)
 - Release decision: included starting in `2026.06.3`
 
-Code or scripts added later should declare their own license separately.
+New code should remain under the project code license unless a file explicitly states otherwise. New lexicon data must continue to declare source-specific licensing before public release.
