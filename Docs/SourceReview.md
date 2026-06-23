@@ -124,12 +124,31 @@ Some bootstrap files inherited from the open KeyKey Boneyard tree have historica
 ### chiaki-modern-overlay
 
 - Name: Chiaki modern overlay phrases
-- Local source: `sources/chiaki-modern-overlay/phrases.tsv`
+- Local source:
+  - `sources/chiaki-modern-overlay/phrases.tsv`
+  - `sources/chiaki-modern-overlay/explicit.tsv`
 - License: CC0-1.0
 - Attribution: Chiaki KeyKey Lexicon maintainers
 - Redistribution decision: included for public releases
 
 This source is intentionally small and project-owned. It is used for obvious seed lexicon misses discovered during hands-on testing, such as basic input-method phrases that should not depend on a future large frequency corpus.
+
+`phrases.tsv` lets the release builder infer readings from single-character data. `explicit.tsv` is used when a fix depends on a specific KeyKey qstring, such as promoting `個` for neutral-tone `ㄍㄜ˙` / `ek7`.
+
+## Included Starting in 2026.06.7
+
+### opencc-variant-policy
+
+- Name: OpenCC-derived Traditional Chinese variant policy
+- Local source: `sources/opencc-variant-policy/variant-demotions.tsv`
+- Upstream reference: <https://github.com/BYVoid/OpenCC>
+- License: Apache-2.0-derived policy
+- Attribution: OpenCC contributors; Chiaki KeyKey Lexicon maintainers
+- Redistribution decision: included for public releases starting in `2026.06.7`
+
+This source is a small reviewed policy table derived from OpenCC's simplified/traditional conversion knowledge. It is not imported as a frequency dictionary. The release builder uses it only to lower Simplified or non-Taiwan-preferred variants when those variants otherwise tie with Traditional Chinese candidates.
+
+The first row demotes `个`, the Simplified counterpart of `個`, so neutral-tone `ㄍㄜ˙` / `ek7` no longer sorts `个` ahead of `個` by tie-break alone.
 
 ## Included Starting in 2026.06.3
 

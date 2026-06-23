@@ -6,7 +6,7 @@
       "id": "smart-mandarin-db",
       "kind": "keykey-source-db",
       "language_model_version": "chiaki-modern-2026.06.7",
-      "sha256": "497373fdd4d62f87d0c242415ce23a23ff61a9a528d321dd2619ce5ce1da085f",
+      "sha256": "ae9f04e29595c04c62cc2f884dbf8df3c4b347375c24fb98dac42937771eb04e",
       "size": 51314688,
       "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.7/KeyKeySource-2026.06.7.db"
     },
@@ -16,8 +16,8 @@
       "id": "smart-mandarin-metadata",
       "kind": "metadata",
       "language_model_version": "chiaki-modern-2026.06.7",
-      "sha256": "b510bdbad280fe26b41ff52caaa32a24b93ae8fce7650c7cdcc723c63d7b2873",
-      "size": 18876,
+      "sha256": "b112199e828a206612528afbddac1448064602aa6d09f26a6dab02da2334d62d",
+      "size": 19979,
       "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.7/KeyKeySource-2026.06.7.json"
     },
     {
@@ -26,13 +26,13 @@
       "id": "smart-mandarin-checksums",
       "kind": "checksum",
       "language_model_version": "chiaki-modern-2026.06.7",
-      "sha256": "3b8fc607eb4a1da7e0900c1ee9c1fd0b00c870efc3b65ed588650dd6be33d15d",
+      "sha256": "45362bbc6f3c42f4abbf5ee9090702a0d35aaf7dfc5f45af902fc1932b04b0e6",
       "size": 186,
       "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/releases/download/2026.06.7/SHA256SUMS"
     }
   ],
   "database_schema_version": 1,
-  "generated_at": "2026-06-23T03:34:42Z",
+  "generated_at": "2026-06-23T04:27:46Z",
   "minimum_app_version": "0.1.0",
   "schema": 1,
   "sources": [
@@ -121,8 +121,19 @@
       "license": "CC0-1.0",
       "name": "Chiaki modern overlay phrases",
       "priority": 300,
-      "sha256": "1f4f57794cdfeeb598d3c67f457430663e90686d68f712f3d8afaa25c7bf667b",
-      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/blob/main/sources/chiaki-modern-overlay/phrases.tsv"
+      "sha256": "42a53154565bc5e23aa6a5bf5e6cc59f0efbe9abf8bc19b43ef1f0cf89364afe",
+      "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/tree/main/sources/chiaki-modern-overlay"
+    },
+    {
+      "attribution": "OpenCC contributors; Chiaki KeyKey Lexicon maintainers",
+      "enabled": true,
+      "format": "tsv",
+      "id": "opencc-variant-policy",
+      "license": "Apache-2.0-derived policy",
+      "name": "OpenCC-derived Traditional Chinese variant policy",
+      "priority": 310,
+      "sha256": "47c7ace0320131cec8858fb6213abe5d903577804dc7ebc86bdaca79b6e9a802",
+      "url": "https://github.com/BYVoid/OpenCC"
     }
   ],
   "version": "2026.06.7"

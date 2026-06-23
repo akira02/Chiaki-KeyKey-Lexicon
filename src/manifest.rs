@@ -1,7 +1,8 @@
 use crate::config::{
     Config, BONEYARD_SOURCE_ID, BONEYARD_SOURCE_NAME, BPMF_EXT_SOURCE_ID, BPMF_EXT_SOURCE_NAME,
     DATABASE_SCHEMA_VERSION, LIBCHEWING_SOURCE_ID, LIBCHEWING_SOURCE_NAME, MODULE_CIN_SOURCE_ID,
-    MODULE_CIN_SOURCE_NAME, OVERLAY_SOURCE_ID, OVERLAY_SOURCE_NAME, PREPOPULATED_SERVICE_SOURCE_ID,
+    MODULE_CIN_SOURCE_NAME, OPENCC_VARIANT_SOURCE_ID, OPENCC_VARIANT_SOURCE_NAME,
+    OVERLAY_SOURCE_ID, OVERLAY_SOURCE_NAME, PREPOPULATED_SERVICE_SOURCE_ID,
     PREPOPULATED_SERVICE_SOURCE_NAME, PUNCTUATION_SOURCE_ID, PUNCTUATION_SOURCE_NAME,
     RIME_ESSAY_SOURCE_ID, RIME_ESSAY_SOURCE_NAME,
 };
@@ -12,7 +13,6 @@ use crate::types::FileInfo;
 use anyhow::Result;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 pub fn release_metadata(
@@ -87,16 +87,22 @@ pub fn release_metadata(
             &paths.rime_essay_inventory,
             db::stats_for_source_rows(source_rows, "sources/rime-essay/raw/"),
         )?,
-        json!({
-            "id": OVERLAY_SOURCE_ID,
-            "name": OVERLAY_SOURCE_NAME,
-            "license": "CC0-1.0",
-            "attribution": "Chiaki KeyKey Lexicon maintainers",
-            "path": "sources/chiaki-modern-overlay/phrases.tsv",
-            "sha256": sha256_file(&paths.overlay_phrases)?,
-            "size": fs::metadata(&paths.overlay_phrases)?.len(),
-            "stats": db::stats_for_source_rows(source_rows, "sources/chiaki-modern-overlay/phrases.tsv")
-        }),
+        release_source(
+            OVERLAY_SOURCE_ID,
+            OVERLAY_SOURCE_NAME,
+            "CC0-1.0",
+            "Chiaki KeyKey Lexicon maintainers",
+            &paths.overlay_inventory,
+            db::stats_for_source_rows(source_rows, "sources/chiaki-modern-overlay/"),
+        )?,
+        release_source(
+            OPENCC_VARIANT_SOURCE_ID,
+            OPENCC_VARIANT_SOURCE_NAME,
+            "Apache-2.0-derived policy",
+            "OpenCC contributors; Chiaki KeyKey Lexicon maintainers",
+            &paths.opencc_variant_inventory,
+            db::stats_for_source_rows(source_rows, "sources/opencc-variant-policy/"),
+        )?,
     ];
 
     Ok(json!({
@@ -201,17 +207,26 @@ pub fn manifest(
             &paths.rime_essay_inventory,
             220,
         )?,
-        json!({
-            "id": OVERLAY_SOURCE_ID,
-            "name": OVERLAY_SOURCE_NAME,
-            "url": "https://github.com/akira02/Chiaki-KeyKey-Lexicon/blob/main/sources/chiaki-modern-overlay/phrases.tsv",
-            "format": "tsv",
-            "license": "CC0-1.0",
-            "attribution": "Chiaki KeyKey Lexicon maintainers",
-            "sha256": sha256_file(&paths.overlay_phrases)?,
-            "enabled": true,
-            "priority": 300
-        }),
+        manifest_source(
+            OVERLAY_SOURCE_ID,
+            OVERLAY_SOURCE_NAME,
+            "https://github.com/akira02/Chiaki-KeyKey-Lexicon/tree/main/sources/chiaki-modern-overlay",
+            "tsv",
+            "CC0-1.0",
+            "Chiaki KeyKey Lexicon maintainers",
+            &paths.overlay_inventory,
+            300,
+        )?,
+        manifest_source(
+            OPENCC_VARIANT_SOURCE_ID,
+            OPENCC_VARIANT_SOURCE_NAME,
+            "https://github.com/BYVoid/OpenCC",
+            "tsv",
+            "Apache-2.0-derived policy",
+            "OpenCC contributors; Chiaki KeyKey Lexicon maintainers",
+            &paths.opencc_variant_inventory,
+            310,
+        )?,
     ];
 
     Ok(json!({

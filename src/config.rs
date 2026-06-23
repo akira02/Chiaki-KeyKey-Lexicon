@@ -35,6 +35,8 @@ pub const RIME_ESSAY_SOURCE_ID: &str = "rime-essay";
 pub const RIME_ESSAY_SOURCE_NAME: &str = "Rime essay shared vocabulary and language model";
 pub const OVERLAY_SOURCE_ID: &str = "chiaki-modern-overlay";
 pub const OVERLAY_SOURCE_NAME: &str = "Chiaki modern overlay phrases";
+pub const OPENCC_VARIANT_SOURCE_ID: &str = "opencc-variant-policy";
+pub const OPENCC_VARIANT_SOURCE_NAME: &str = "OpenCC-derived Traditional Chinese variant policy";
 pub const DATABASE_SCHEMA_VERSION: i64 = 1;
 
 pub const DOWNLOADS: &[SourceDownload] = &[
@@ -87,7 +89,7 @@ pub struct Config {
 
 pub fn load() -> Result<Config> {
     let root = env::current_dir().context("read current directory")?;
-    let release_version = env_or("LEXICON_VERSION", "2026.06.6");
+    let release_version = env_or("LEXICON_VERSION", "2026.06.7");
     let language_model_version = format!("chiaki-modern-{release_version}");
     let minimum_app_version = env_or("MINIMUM_APP_VERSION", "0.1.0");
     let generated_at = env::var("GENERATED_AT")
