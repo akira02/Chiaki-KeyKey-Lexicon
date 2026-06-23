@@ -251,5 +251,5 @@ jobs:
             "${release_dir}/lexicon-manifest.json" \
             "${release_dir}/SHA256SUMS" \
             --target "$GITHUB_SHA" \
-            --title "Chiaki KeyKey Lexicon ${version}" \
+            --title "ChiaKey Lexicon ${version}" \
             --notes "Automated lexicon release built by the Rust release toolchain."
