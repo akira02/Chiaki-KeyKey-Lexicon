@@ -1,72 +1,74 @@
 # Chiaki KeyKey Lexicon
 
-Chiaki KeyKey Lexicon is the data-side repository for Chiaki KeyKey.
+[English](README.en.md)
 
-The main app repository should stay focused on the macOS input method runtime, database reader, builder scripts, installation tooling, and a small bundled fallback database. This repository owns the evolving lexicon data, source manifests, license notes, normalized intermediate data, release database artifacts, checksums, and changelog.
+Chiaki KeyKey Lexicon 是 Chiaki KeyKey 的詞庫資料 repository。
 
-## Intended Split
+主 app repository 應該專注在 macOS 輸入法 runtime、資料庫讀取、builder script、安裝工具，以及一份小型 bundled fallback database。這個 repository 則負責持續演進的詞庫資料、來源 manifest、授權紀錄、normalized intermediate data、release database artifacts、checksums 與 changelog。
 
-`Chiaki-KeyKey` owns:
+## 分工
 
-1. macOS IMK runtime.
-2. Input engine integration.
-3. Database schema and reader.
-4. Builder scripts that can consume this repo's normalized data.
-5. A bundled fallback `KeyKeySource.db`.
+`Chiaki-KeyKey` 負責：
 
-`Chiaki-KeyKey-Lexicon` owns:
+1. macOS IMK runtime。
+2. 輸入引擎整合。
+3. 資料庫 schema 與 reader。
+4. 可消費此 repo normalized data 的 builder script。
+5. bundled fallback `KeyKeySource.db`。
 
-1. Source manifests.
-2. Source license and attribution records.
-3. Normalized lexicon data.
-4. Release-ready `KeyKeySource` database artifacts.
-5. Checksums or signatures.
-6. Lexicon release changelog.
+`Chiaki-KeyKey-Lexicon` 負責：
 
-## Current Status
+1. source manifests。
+2. source license 與 attribution records。
+3. normalized lexicon data。
+4. release-ready `KeyKeySource` database artifacts。
+5. checksums 或 signatures。
+6. lexicon release changelog。
 
-This repository has an active seed release pipeline. Pushes to `main` build and publish versioned lexicon releases through GitHub Actions.
+## 目前狀態
 
-The current pipeline builds a complete `KeyKeySource.db` from reviewed source data, project-owned corrections, generated metadata, source inventories, and checksum manifests. Release artifacts are produced under `dist/<version>/` locally and uploaded to GitHub Releases by CI.
+這個 repository 已有可運作的 seed release pipeline。push 到 `main` 會透過 GitHub Actions 建置並發布版本化詞庫 release。
 
-Start with:
+目前 pipeline 會從已審查來源資料、專案維護修正、生成 metadata、source inventories 與 checksum manifests 建出完整的 `KeyKeySource.db`。本機 release artifacts 會輸出到 `dist/<version>/`，CI 則會上傳到 GitHub Releases。
+
+建議先看：
 
 - [Docs/ReleaseFlow.zh-TW.md](Docs/ReleaseFlow.zh-TW.md)
 - [Docs/SourceReview.md](Docs/SourceReview.md)
 
-Fetch pinned external source files with:
+下載 pinned external source files：
 
 ```sh
 cargo run --release -- fetch-modern-sources
 ```
 
-Then build the local release package with:
+建立本機 release package：
 
 ```sh
 cargo run --release -- prepare-release
 ```
 
-## Architecture
+## 架構
 
-The repository is organized around a reproducible data pipeline:
+這個 repository 以可重現的資料 pipeline 為核心：
 
-1. `sources/<source-id>/` holds each reviewed input source, its local README, and a `source-inventory.sha256` provenance file.
-2. `LICENSES/` records the license text or license notes needed for every source that can ship in a public release.
-3. `src/` contains the Rust release toolchain. It verifies inputs, imports data layers into the KeyKey database shape, writes normalized TSV output, updates release metadata, and generates manifests.
-4. `normalized/smart-mandarin.tsv` is the generated normalized interchange view of the Smart Mandarin language-model rows.
-5. `manifests/lexicon-manifest.json` is the generated update contract consumed by the app.
-6. `dist/<version>/` is local staging for release artifacts and is not committed.
+1. `sources/<source-id>/` 放每個已審查 input source、本地 README，以及 `source-inventory.sha256` provenance file。
+2. `LICENSES/` 記錄每個可公開 release source 所需的 license text 或 license notes。
+3. `src/` 是 Rust release toolchain，負責驗證 inputs、將資料層匯入 KeyKey database shape、寫出 normalized TSV、更新 release metadata、產生 manifests。
+4. `normalized/smart-mandarin.tsv` 是 Smart Mandarin language-model rows 的 generated normalized interchange view。
+5. `manifests/lexicon-manifest.json` 是 app 端消費的 generated update contract。
+6. `dist/<version>/` 是本機 release artifacts staging 目錄，不 commit。
 
-The data layers fall into four broad groups:
+資料層大致分成四類：
 
-1. **Runtime compatibility data**: reviewed KeyKey-origin data needed by the app's existing database reader and input modules.
-2. **Lexicon sources**: modern Traditional Chinese / Zhuyin vocabulary and supplemental character or phrase coverage.
-3. **Project-owned corrections**: small overlays for known typing misses, explicit reading fixes, and candidate ordering adjustments.
-4. **Policy layers**: small reviewed rules that keep the default Traditional Chinese release aligned with the app's language and region expectations.
+1. **Runtime compatibility data**：app 既有 database reader 與 input modules 需要的 KeyKey-origin data。
+2. **Lexicon sources**：現代繁中 / 注音詞彙，以及補充字詞 coverage。
+3. **Project-owned corrections**：小型 overlay，用來修已知輸入缺漏、指定讀音、調整候選排序。
+4. **Policy layers**：小型已審查規則，讓預設繁中 release 符合 app 的語言與地區期待。
 
-Detailed source-by-source license and redistribution decisions live in [Docs/SourceReview.md](Docs/SourceReview.md). Day-to-day release mechanics live in [Docs/ReleaseFlow.zh-TW.md](Docs/ReleaseFlow.zh-TW.md).
+各來源的授權、redistribution decision 與風險紀錄放在 [Docs/SourceReview.md](Docs/SourceReview.md)。日常 release 操作放在 [Docs/ReleaseFlow.zh-TW.md](Docs/ReleaseFlow.zh-TW.md)。
 
-## Repository Layout
+## Repository 目錄
 
 ```text
 Docs/
@@ -86,11 +88,11 @@ sources/
   .gitkeep
 ```
 
-Built release artifacts are not tracked in git. Use a local staging directory such as `dist/`, then upload the artifacts to GitHub Releases.
+建置完成的 release artifacts 不會 commit 進 git。請用 `dist/` 之類的本機 staging 目錄，再由 GitHub Releases 發布 artifacts。
 
-## Release Shape
+## Release 內容
 
-A GitHub Release should publish:
+GitHub Release 應發布：
 
 ```text
 KeyKeySource-YYYY.MM.N.db
@@ -99,18 +101,18 @@ lexicon-manifest.json
 SHA256SUMS
 ```
 
-The main app should download and verify `lexicon-manifest.json`, then install a compatible `KeyKeySource` database into:
+主 app 應下載並驗證 `lexicon-manifest.json`，再把相容的 `KeyKeySource` database 安裝到：
 
 ```text
 ~/Library/Application Support/Chiaki KeyKey/Lexicons/
 ```
 
-Runtime database loading should fall back to the bundled database if the active external database is missing, invalid, or incompatible.
+runtime 載入資料庫時，若 active external database 不存在、無效或不相容，應 fallback 到 bundled database。
 
-## License Policy
+## 授權政策
 
-Rust release tooling and repository scripts are licensed under the MIT License; see [LICENSE-CODE](LICENSE-CODE).
+Rust release tooling 與 repository scripts 使用 MIT License；見 [LICENSE-CODE](LICENSE-CODE)。
 
-There is no repository-wide data license yet.
+詞庫資料沒有單一 repository-wide license。
 
-Every source must declare its own license before it can be used in a public release. Unknown-license data may be used only for local experiments and must not be included in release artifacts.
+每個 source 都必須在公開 release 前宣告自己的 license。未知授權資料只能做本機實驗，不可包含在 public release artifacts。
