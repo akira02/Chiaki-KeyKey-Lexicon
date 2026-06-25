@@ -34,6 +34,6 @@ fn main() -> Result<()> {
 
 fn print_help() {
     eprintln!(
-        "Usage:\n  cargo run --release -- fetch-modern-sources\n  cargo run --release -- prepare-release\n  cargo run --release -- build-bigram-stats --input sentences.txt --output bigrams.tsv --stats bigram-stats.tsv\n  cargo run --release -- build-unigram-candidates --input sentences.txt --output unigram-candidates.tsv"
+        "Usage:\n  cargo run --release -- fetch-modern-sources\n  cargo run --release -- prepare-release\n  cargo run --release -- build-bigram-stats --input sentences.txt --output bigrams.tsv --stats bigram-stats.tsv --review bigram-review.tsv --top-n 1000\n  cargo run --release -- build-unigram-candidates --input sentences.txt --output unigram-candidates.tsv"
     );
 }

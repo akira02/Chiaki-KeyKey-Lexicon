@@ -1,5 +1,6 @@
 use crate::config::{
     Config, BONEYARD_SOURCE_ID, BONEYARD_SOURCE_NAME, BPMF_EXT_SOURCE_ID, BPMF_EXT_SOURCE_NAME,
+    CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID, CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_NAME,
     CHIAKI_WEB_OVERLAY_SOURCE_ID, CHIAKI_WEB_OVERLAY_SOURCE_NAME, DATABASE_SCHEMA_VERSION,
     LIBCHEWING_SOURCE_ID, LIBCHEWING_SOURCE_NAME, MODULE_CIN_SOURCE_ID, MODULE_CIN_SOURCE_NAME,
     MOZC_EMOTICON_SOURCE_ID, MOZC_EMOTICON_SOURCE_NAME, OPENCC_VARIANT_SOURCE_ID,
@@ -120,6 +121,14 @@ pub fn release_metadata(
             "ChiaKey Lexicon maintainers",
             &paths.chiaki_web_overlay_inventory,
             db::stats_for_source_rows(source_rows, "sources/chiaki-web-overlay/"),
+        )?,
+        release_source(
+            CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID,
+            CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_NAME,
+            "CC BY-NC 4.0; commercial use requires permission from Chiaki.C",
+            "Chiaki.C",
+            &paths.chiaki_synthetic_dialogue_inventory,
+            db::stats_for_source_rows(source_rows, "sources/chiaki-synthetic-dialogue-overlay/"),
         )?,
         release_source(
             OPENCC_VARIANT_SOURCE_ID,
@@ -272,6 +281,16 @@ pub fn manifest(
             "ChiaKey Lexicon maintainers",
             &paths.chiaki_web_overlay_inventory,
             305,
+        )?,
+        manifest_source(
+            CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID,
+            CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_NAME,
+            "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiaki-synthetic-dialogue-overlay",
+            "tsv",
+            "CC BY-NC 4.0; commercial use requires permission from Chiaki.C",
+            "Chiaki.C",
+            &paths.chiaki_synthetic_dialogue_inventory,
+            306,
         )?,
         manifest_source(
             OPENCC_VARIANT_SOURCE_ID,

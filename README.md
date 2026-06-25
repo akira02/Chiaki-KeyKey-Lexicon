@@ -76,6 +76,8 @@ cargo run --release -- prepare-release
 | `bpmf-ext-cin` | libchewing 和 bootstrap 仍可能缺少單字候選；這份 public-domain CIN 表可以補足單字 coverage。 | 只補 CJK BMP 單字的缺失 `(reading, character)` pair，不覆蓋 libchewing 或 bootstrap 既有權重。 |
 | `rime-essay` | Rime essay 有較廣的現代詞彙與語言模型分數，但沒有注音讀音；適合當低優先補充層，而不是主詞庫。 | 僅在詞尚未存在、分數達門檻、長度合理，且每個字都能從目前 DB 推得 primary reading 時匯入。 |
 | `chiakey-modern-overlay` | 真實打字測試會發現少量立即需要修的缺漏或排序問題；這些修正應由專案自己維護，不能等大型來源更新。 | 補專案自有詞、指定明確 qstring，或針對已知 case 調整候選排序，例如 neutral-tone `ㄍㄜ˙` / `ek7`。 |
+| `chiaki-web-overlay` | 經人工審過的網路用語 overlay，僅作為 ChiaKey 詞庫的窄補充；其他專案或非 ChiaKey 用途預設應排除，除非自行完成來源審查。 | 匯入 explicit unigram 與 runtime bigram rows；只保存最終詞庫 rows，不保存原始語料。 |
+| `chiaki-synthetic-dialogue-overlay` | 由 GPT-5.5 合成「台灣網路用語」語料，並經專案清洗與統計後形成的詞庫 overlay。 | 從 `unigrams.tsv` 匯入 1,328 筆 unigram rows；此來源採 CC BY-NC 4.0，非商用與開源專案可使用，商用請聯絡 Chiaki.C。 |
 | `opencc-variant-policy` | 預設繁中輸入法不應讓簡體或非台灣慣用字因 tie-break 排在繁體字前面。OpenCC 可作為 variant knowledge 的參考，但不當作頻率詞典匯入。 | 用小型 policy table 降低指定 variant 的最大權重，例如讓 `个` 不會排在 `個` 前面。 |
 
 另外，release builder 會從整合完成的 `unigrams` 派生 `associated_phrases` runtime table。這張表不是獨立詞源，而是提供「聯想詞提示」使用的 head-character -> phrase-tail 候選，例如輸出 `我` 後可提示 `們`、`的` 等詞尾。
@@ -90,11 +92,13 @@ release builder 的整合流程是 deterministic 的：
 4. 匯入 `bpmf-ext-cin`，只補缺少的單字讀音，不覆蓋既有資料。
 5. 匯入 `rime-essay`，只加入目前 DB 尚無、且能安全推得注音的補充詞。
 6. 匯入 `chiakey-modern-overlay/phrases.tsv`，讓專案自有修正可以替換已知問題詞。
-7. 套用 `opencc-variant-policy`，降低不符合預設繁中期待的 variant 權重。
-8. 匯入 `chiakey-modern-overlay/explicit.tsv`，處理需要指定 qstring 或排序的精準修正。
-9. 補入 runtime compatibility data：BPMF 標點、ChiaKey supplemental symbol list、canned messages、Mozc 顏文字、module CIN tables。
-10. 從最終 `unigrams` 派生 `associated_phrases`，供聯想詞提示使用。
-11. 執行 runtime-required validations，寫出 normalized TSV、release metadata、manifest 與 checksums。
+7. 匯入 `chiakey-modern-overlay/explicit.tsv`，處理需要指定 qstring 或排序的精準修正。
+8. 匯入 `chiaki-web-overlay/explicit.tsv` 與 `chiaki-synthetic-dialogue-overlay/unigrams.tsv`。
+9. 套用 `opencc-variant-policy`，降低不符合預設繁中期待的 variant 權重。
+10. 匯入 `chiaki-web-overlay/bigrams.tsv`。
+11. 補入 runtime compatibility data：BPMF 標點、ChiaKey supplemental symbol list、canned messages、Mozc 顏文字、module CIN tables。
+12. 從最終 `unigrams` 派生 `associated_phrases`，供聯想詞提示使用。
+13. 執行 runtime-required validations，寫出 normalized TSV、release metadata、manifest 與 checksums。
 
 整合後，每筆可追蹤的詞庫 row 會帶有 source path、source kind、checksum 與 tags；app 端消費的是最後生成的 `KeyKeySource.db` 和 `lexicon-manifest.json`，維護端可在本機 build 後從 generated `normalized/smart-mandarin.tsv` 和 metadata 回查來源。
 

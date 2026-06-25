@@ -1,4 +1,6 @@
 use anyhow::{bail, Context, Result};
+mod review;
+
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
@@ -13,7 +15,7 @@ struct LexiconEntry {
 
 struct Lexicon {
     by_phrase: HashMap<String, LexiconEntry>,
-    first_by_qstring: HashMap<String, String>,
+    rank_by_qstring_phrase: HashMap<(String, String), usize>,
     max_phrase_codepoints: usize,
 }
 
@@ -21,6 +23,7 @@ struct Lexicon {
 struct BigramCount {
     count: usize,
     doc_count: usize,
+    examples: Vec<String>,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]
@@ -43,7 +46,10 @@ struct Args {
     lexicon: PathBuf,
     min_count: usize,
     min_doc_count: usize,
+    top_n: Option<usize>,
     probability: f64,
+    review: Option<PathBuf>,
+    review_examples: usize,
     max_phrase_codepoints: usize,
     document_boundary: DocumentBoundary,
     include_redundant: bool,
@@ -76,7 +82,12 @@ enum DocumentBoundary {
 pub fn run(args: impl Iterator<Item = String>) -> Result<()> {
     let args = parse_args(args)?;
     let lexicon = load_lexicon(&args.lexicon, args.max_phrase_codepoints)?;
-    let counts = count_bigrams(&args.input, &lexicon, args.document_boundary)?;
+    let example_limit = args
+        .review
+        .as_ref()
+        .map(|_| args.review_examples)
+        .unwrap_or(0);
+    let counts = count_bigrams(&args.input, &lexicon, args.document_boundary, example_limit)?;
     write_outputs(&args, &lexicon, &counts)
 }
 
@@ -95,7 +106,10 @@ fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Args> {
         lexicon: PathBuf::from("normalized/smart-mandarin.tsv"),
         min_count: 2,
         min_doc_count: 1,
+        top_n: None,
         probability: -0.1,
+        review: None,
+        review_examples: 2,
         max_phrase_codepoints: 7,
         document_boundary: DocumentBoundary::Line,
         include_redundant: false,
@@ -110,7 +124,16 @@ fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Args> {
             "--lexicon" => parsed.lexicon = value_path(&arg, &mut args)?,
             "--min-count" => parsed.min_count = value_usize(&arg, &mut args)?,
             "--min-doc-count" => parsed.min_doc_count = value_usize(&arg, &mut args)?,
+            "--top-n" => {
+                let value = value_usize(&arg, &mut args)?;
+                if value == 0 {
+                    bail!("--top-n must be at least 1");
+                }
+                parsed.top_n = Some(value);
+            }
             "--probability" => parsed.probability = value_f64(&arg, &mut args)?,
+            "--review" => parsed.review = Some(value_path(&arg, &mut args)?),
+            "--review-examples" => parsed.review_examples = value_usize(&arg, &mut args)?,
             "--max-phrase-codepoints" => {
                 parsed.max_phrase_codepoints = value_usize(&arg, &mut args)?
             }
@@ -240,7 +263,7 @@ fn value(arg: &str, args: &mut impl Iterator<Item = String>) -> Result<String> {
 
 fn print_help() {
     eprintln!(
-        "Usage:\n  cargo run --release -- build-bigram-stats \\\n    --input sentences.txt \\\n    --output bigrams.tsv \\\n    --stats bigram-stats.tsv \\\n    [--lexicon normalized/smart-mandarin.tsv] \\\n    [--min-count 2] [--min-doc-count 1] \\\n    [--document-boundary line|blank-line] \\\n    [--include-redundant] [--include-excluded-stats]"
+        "Usage:\n  cargo run --release -- build-bigram-stats \\\n    --input sentences.txt \\\n    --output bigrams.tsv \\\n    --stats bigram-stats.tsv \\\n    [--review bigram-review.tsv] [--review-examples 2] \\\n    [--lexicon normalized/smart-mandarin.tsv] \\\n    [--min-count 2] [--min-doc-count 1] [--top-n 1000] \\\n    [--document-boundary line|blank-line] \\\n    [--include-redundant] [--include-excluded-stats]"
     );
 }
 
@@ -288,20 +311,17 @@ fn load_lexicon(path: &PathBuf, max_phrase_codepoints: usize) -> Result<Lexicon>
         }
     }
 
-    let first_by_qstring = by_qstring
-        .into_iter()
-        .filter_map(|(qstring, mut entries)| {
-            entries.sort_by(|a, b| compare_unigram(a, b));
-            entries
-                .into_iter()
-                .next()
-                .map(|(phrase, _)| (qstring, phrase))
-        })
-        .collect::<HashMap<_, _>>();
+    let mut rank_by_qstring_phrase = HashMap::new();
+    for (qstring, mut entries) in by_qstring {
+        entries.sort_by(|a, b| compare_unigram(a, b));
+        for (index, (phrase, _weight)) in entries.into_iter().enumerate() {
+            rank_by_qstring_phrase.insert((qstring.clone(), phrase), index + 1);
+        }
+    }
 
     Ok(Lexicon {
         by_phrase,
-        first_by_qstring,
+        rank_by_qstring_phrase,
         max_phrase_codepoints,
     })
 }
@@ -320,6 +340,7 @@ fn count_bigrams(
     path: &PathBuf,
     lexicon: &Lexicon,
     document_boundary: DocumentBoundary,
+    max_examples_per_candidate: usize,
 ) -> Result<HashMap<BigramKey, BigramCount>> {
     let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
     let reader = BufReader::new(file);
@@ -333,7 +354,13 @@ fn count_bigrams(
             continue;
         }
 
-        count_line_bigrams(&line, lexicon, &mut counts, &mut seen_in_doc);
+        count_line_bigrams(
+            &line,
+            lexicon,
+            &mut counts,
+            &mut seen_in_doc,
+            max_examples_per_candidate,
+        );
 
         if matches!(document_boundary, DocumentBoundary::Line) {
             flush_doc_counts(&mut counts, &mut seen_in_doc);
@@ -377,6 +404,7 @@ fn count_line_bigrams(
     lexicon: &Lexicon,
     counts: &mut HashMap<BigramKey, BigramCount>,
     seen_in_doc: &mut HashSet<BigramKey>,
+    max_examples_per_candidate: usize,
 ) {
     for sentence in han_sentences(line) {
         let tokens = tokenize_sentence(&sentence, lexicon);
@@ -390,6 +418,12 @@ fn count_line_bigrams(
             };
             let entry = counts.entry(key.clone()).or_default();
             entry.count += 1;
+            if max_examples_per_candidate > 0
+                && entry.examples.len() < max_examples_per_candidate
+                && !entry.examples.iter().any(|example| example == &sentence)
+            {
+                entry.examples.push(sentence.clone());
+            }
             seen_in_doc.insert(key);
         }
     }
@@ -571,14 +605,16 @@ fn write_outputs(
 
     writeln!(
         stats,
-        "previous\tcurrent\tcount\tdoc_count\tredundant\texcluded_particle\texcluded_single_char_pair\texcluded_joined_unigram\tprevious_qstring\tcurrent_qstring"
+        "previous\tcurrent\tcount\tdoc_count\tselected\tredundant\texcluded_particle\texcluded_single_char_pair\texcluded_joined_unigram\tprevious_rank\tcurrent_rank\tprevious_qstring\tcurrent_qstring"
     )?;
+    writeln!(output, "# qstring\tprevious\tcurrent\tprobability")?;
 
     let mut emitted = 0_usize;
     let mut redundant = 0_usize;
     let mut excluded_particle = 0_usize;
     let mut excluded_single_char_pair = 0_usize;
     let mut excluded_joined_unigram = 0_usize;
+    let mut review_rows = Vec::new();
     for (key, count) in rows {
         let Some(previous) = lexicon.by_phrase.get(&key.previous) else {
             continue;
@@ -586,8 +622,9 @@ fn write_outputs(
         let Some(current) = lexicon.by_phrase.get(&key.current) else {
             continue;
         };
-        let is_redundant =
-            is_redundant_pair(lexicon, &key.previous, previous, &key.current, current);
+        let previous_rank = unigram_rank(lexicon, &key.previous, previous);
+        let current_rank = unigram_rank(lexicon, &key.current, current);
+        let is_redundant = is_redundant_pair(previous_rank, current_rank);
         if is_redundant {
             redundant += 1;
         }
@@ -605,25 +642,30 @@ fn write_outputs(
             excluded_joined_unigram += 1;
         }
 
-        let should_emit = count.count >= args.min_count
+        let is_eligible = count.count >= args.min_count
             && count.doc_count >= args.min_doc_count
             && (!is_redundant || args.include_redundant)
             && !has_excluded_particle
             && !is_single_char_pair
             && !has_joined_unigram;
+        let within_top_n = args.top_n.map(|limit| emitted < limit).unwrap_or(true);
+        let should_emit = is_eligible && within_top_n;
 
-        if should_emit || args.include_excluded_stats {
+        if is_eligible || args.include_excluded_stats {
             writeln!(
                 stats,
-                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 key.previous,
                 key.current,
                 count.count,
                 count.doc_count,
+                should_emit,
                 is_redundant,
                 has_excluded_particle,
                 is_single_char_pair,
                 has_joined_unigram,
+                previous_rank,
+                current_rank,
                 previous.qstring,
                 current.qstring
             )?;
@@ -638,11 +680,27 @@ fn write_outputs(
             "{} {}\t{}\t{}\t{}",
             previous.qstring, current.qstring, key.previous, key.current, args.probability
         )?;
+        review_rows.push(review::ReviewRow {
+            previous: key.previous.clone(),
+            current: key.current.clone(),
+            count: count.count,
+            doc_count: count.doc_count,
+            previous_qstring: previous.qstring.clone(),
+            current_qstring: current.qstring.clone(),
+            previous_rank,
+            current_rank,
+            probability: args.probability,
+            examples: count.examples.clone(),
+        });
         emitted += 1;
     }
 
+    if let Some(review_path) = &args.review {
+        review::write_review(review_path, &review_rows)?;
+    }
+
     eprintln!(
-        "bigram stats: pairs={} redundant={} excluded_particle={} excluded_single_char_pair={} excluded_joined_unigram={} emitted={} min_count={} min_doc_count={}",
+        "bigram stats: pairs={} redundant={} excluded_particle={} excluded_single_char_pair={} excluded_joined_unigram={} emitted={} min_count={} min_doc_count={} top_n={}",
         counts.len(),
         redundant,
         excluded_particle,
@@ -650,7 +708,10 @@ fn write_outputs(
         excluded_joined_unigram,
         emitted,
         args.min_count,
-        args.min_doc_count
+        args.min_doc_count,
+        args.top_n
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "unlimited".to_string())
     );
 
     Ok(())
@@ -717,21 +778,16 @@ fn write_unigram_candidate_outputs(
     Ok(())
 }
 
-fn is_redundant_pair(
-    lexicon: &Lexicon,
-    previous_phrase: &str,
-    previous: &LexiconEntry,
-    current_phrase: &str,
-    current: &LexiconEntry,
-) -> bool {
+fn is_redundant_pair(previous_rank: usize, current_rank: usize) -> bool {
+    previous_rank == 1 && current_rank == 1
+}
+
+fn unigram_rank(lexicon: &Lexicon, phrase: &str, entry: &LexiconEntry) -> usize {
     lexicon
-        .first_by_qstring
-        .get(&previous.qstring)
-        .is_some_and(|phrase| phrase == previous_phrase)
-        && lexicon
-            .first_by_qstring
-            .get(&current.qstring)
-            .is_some_and(|phrase| phrase == current_phrase)
+        .rank_by_qstring_phrase
+        .get(&(entry.qstring.clone(), phrase.to_string()))
+        .copied()
+        .unwrap_or(1)
 }
 
 fn contains_excluded_particle(phrase: &str) -> bool {
@@ -798,7 +854,7 @@ mod tests {
         );
         let lexicon = Lexicon {
             by_phrase,
-            first_by_qstring: HashMap::new(),
+            rank_by_qstring_phrase: HashMap::new(),
             max_phrase_codepoints: 4,
         };
         assert_eq!(tokenize_sentence("程式語言", &lexicon), vec!["程式語言"]);
@@ -837,7 +893,7 @@ mod tests {
         );
         let lexicon = Lexicon {
             by_phrase,
-            first_by_qstring: HashMap::new(),
+            rank_by_qstring_phrase: HashMap::new(),
             max_phrase_codepoints: 4,
         };
         assert_eq!(tokenize_sentence("還以為", &lexicon), vec!["還", "以為"]);
@@ -864,6 +920,71 @@ mod tests {
 
         assert_eq!(lexicon.by_phrase.get("十").unwrap().qstring, "p?");
         assert_eq!(lexicon.by_phrase.get("拍").unwrap().qstring, "_5");
+    }
+
+    #[test]
+    fn ranks_unigram_candidates_for_redundant_filtering() {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "chiakey-bigram-rank-test-{}.tsv",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::write(
+            &path,
+            "a\t台北\t-0.1\ttest\n\
+             a\t抬北\t-0.8\ttest\n\
+             b\t捷運\t-0.2\ttest\n\
+             b\t接運\t-0.9\ttest\n",
+        )
+        .unwrap();
+
+        let lexicon = load_lexicon(&path, 7).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let taipei = lexicon.by_phrase.get("台北").unwrap();
+        let typo = lexicon.by_phrase.get("抬北").unwrap();
+        let mrt = lexicon.by_phrase.get("捷運").unwrap();
+
+        assert_eq!(unigram_rank(&lexicon, "台北", taipei), 1);
+        assert_eq!(unigram_rank(&lexicon, "抬北", typo), 2);
+        assert_eq!(unigram_rank(&lexicon, "捷運", mrt), 1);
+        assert!(is_redundant_pair(1, 1));
+        assert!(!is_redundant_pair(2, 1));
+    }
+
+    #[test]
+    fn keeps_limited_review_examples_for_bigram_counts() {
+        let mut by_phrase = HashMap::new();
+        for (phrase, qstring) in [("台北", "a"), ("捷運", "b"), ("方便", "c")] {
+            by_phrase.insert(
+                phrase.to_string(),
+                LexiconEntry {
+                    qstring: qstring.to_string(),
+                    weight: 0.0,
+                },
+            );
+        }
+        let lexicon = Lexicon {
+            by_phrase,
+            rank_by_qstring_phrase: HashMap::new(),
+            max_phrase_codepoints: 2,
+        };
+        let mut counts = HashMap::new();
+        let mut seen_in_doc = HashSet::new();
+
+        count_line_bigrams("台北捷運方便", &lexicon, &mut counts, &mut seen_in_doc, 1);
+        count_line_bigrams("台北捷運", &lexicon, &mut counts, &mut seen_in_doc, 1);
+
+        let count = counts
+            .get(&BigramKey {
+                previous: "台北".to_string(),
+                current: "捷運".to_string(),
+            })
+            .unwrap();
+        assert_eq!(count.count, 2);
+        assert_eq!(count.examples, vec!["台北捷運方便".to_string()]);
     }
 
     #[test]
@@ -920,15 +1041,11 @@ mod tests {
                 weight: -2.0,
             },
         );
-        let mut lexicon = Lexicon {
+        let lexicon = Lexicon {
             by_phrase,
-            first_by_qstring: HashMap::new(),
+            rank_by_qstring_phrase: HashMap::new(),
             max_phrase_codepoints: 4,
         };
-        lexicon.first_by_qstring.insert("L`".into(), "下".into());
-        lexicon
-            .first_by_qstring
-            .insert("5_0_".into(), "意識".into());
 
         assert!(has_joined_unigram(&lexicon, "下", "意識"));
         assert!(!has_joined_unigram(&lexicon, "意識", "下"));
@@ -967,7 +1084,7 @@ mod tests {
         );
         let lexicon = Lexicon {
             by_phrase,
-            first_by_qstring: HashMap::new(),
+            rank_by_qstring_phrase: HashMap::new(),
             max_phrase_codepoints: 4,
         };
         let args = UnigramCandidateArgs {
@@ -1027,7 +1144,7 @@ mod tests {
         }
         let lexicon = Lexicon {
             by_phrase,
-            first_by_qstring: HashMap::new(),
+            rank_by_qstring_phrase: HashMap::new(),
             max_phrase_codepoints: 4,
         };
         let args = UnigramCandidateArgs {

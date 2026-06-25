@@ -186,13 +186,18 @@ sources/mozc-emoticon-data/source-inventory.sha256
 - Local sources:
   - `sources/chiaki-web-overlay/explicit.tsv`
   - `sources/chiaki-web-overlay/bigrams.tsv`
-- Source material: Traditional Chinese Wikipedia and Chiaki's own social media posts
-- License: CC0-1.0
-- Attribution: ChiaKey Lexicon maintainers
-- Redistribution decision: included for public releases starting in the next corpus refresh
+- Source material: reviewed web-derived Taiwan internet usage material
+- License: CC0-1.0 for the reviewed overlay rows; source text is not redistributed
+- Attribution: Chiaki.C
+- Redistribution decision: included for ChiaKey public releases; other projects
+  or non-ChiaKey uses should exclude this source by default unless they perform
+  their own source review
 
-This source contains reviewed unigram and bigram values derived outside the
-repository. It redistributes only the final lexicon rows in the release-builder
+I use this source as a narrow ChiaKey overlay for reviewed unigram and bigram
+values derived from web usage material. Because web-derived terms can carry
+context, provenance, or licensing risk outside this specific lexicon use case, I
+do not recommend treating it as a general-purpose reusable source. The
+repository redistributes only the final lexicon rows in the release-builder
 formats:
 
 ```text
@@ -208,6 +213,35 @@ The generated source inventory is stored at:
 
 ```text
 sources/chiaki-web-overlay/source-inventory.sha256
+```
+
+### chiaki-synthetic-dialogue-overlay
+
+- Name: Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay
+- Local source: `sources/chiaki-synthetic-dialogue-overlay/unigrams.tsv`
+- Source material: GPT-5.5-generated synthetic "Taiwan internet usage" (台灣網路用語) corpus
+- License: CC BY-NC 4.0; commercial use requires permission from Chiaki.C
+- Attribution: Chiaki.C
+- Redistribution decision: included for public source review, open-source project use, and non-commercial release builds starting in the next synthetic Taiwan internet usage overlay refresh
+
+I generated this source with GPT-5.5 for simulated "Taiwan internet usage"
+(台灣網路用語), then reduced it through project cleaning and statistical
+selection for ChiaKey lexicon maintenance. The raw synthetic corpus is not
+redistributed in this repository; only the final lexicon rows are kept:
+
+```text
+qstring<TAB>phrase<TAB>weight<TAB>tags
+```
+
+This source was generated as OpenAI output for which OpenAI assigns any OpenAI
+right, title, and interest in Output to the user, to the extent permitted by
+applicable law. I am not using this material for a competing model, and I record
+it as my synthetic overlay data rather than as an external public-domain corpus.
+
+The generated source inventory is stored at:
+
+```text
+sources/chiaki-synthetic-dialogue-overlay/source-inventory.sha256
 ```
 
 ## Excluded from v1

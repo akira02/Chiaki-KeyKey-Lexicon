@@ -161,6 +161,11 @@ pub fn apply_prepopulated_service_data(
         "CREATE TABLE IF NOT EXISTS prepopulated_service_data (key, value)",
         [],
     )?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS prepopulated_service_data_index
+         ON prepopulated_service_data (key)",
+        [],
+    )?;
 
     let timestamp = data.timestamp.to_string();
     let rows = [

@@ -1,6 +1,6 @@
 use crate::config::{
-    Config, CHIAKI_WEB_OVERLAY_SOURCE_ID, LIBCHEWING_SOURCE_ID, OVERLAY_SOURCE_ID,
-    RIME_ESSAY_SOURCE_ID,
+    Config, CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID, CHIAKI_WEB_OVERLAY_SOURCE_ID,
+    LIBCHEWING_SOURCE_ID, OVERLAY_SOURCE_ID, RIME_ESSAY_SOURCE_ID,
 };
 use crate::phonetics::{phrase_candidate, qstring_for_bpmf_sequence};
 use crate::types::{
@@ -301,6 +301,13 @@ pub fn parse_chiaki_web_overlay(
     cfg: &Config,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
     parse_explicit_records(path, cfg, CHIAKI_WEB_OVERLAY_SOURCE_ID)
+}
+
+pub fn parse_chiaki_synthetic_dialogue_overlay(
+    path: &Path,
+    cfg: &Config,
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    parse_explicit_records(path, cfg, CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID)
 }
 
 pub fn parse_bigram_overlay(

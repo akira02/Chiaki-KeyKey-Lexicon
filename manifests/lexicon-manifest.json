@@ -6,8 +6,8 @@
       "id": "smart-mandarin-db",
       "kind": "keykey-source-db",
       "language_model_version": "chiakey-modern-2026.06.9",
-      "sha256": "47437a372352fa9657bf5682dc6b5e41a135f0b412e9351461632eccd7810168",
-      "size": 53067776,
+      "sha256": "c14a756f626742ad9f3954c82d60654581c2ab8062ec03475d9bfff3f5366ba1",
+      "size": 54599680,
       "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/KeyKeySource-2026.06.9.db"
     },
     {
@@ -16,8 +16,8 @@
       "id": "smart-mandarin-metadata",
       "kind": "metadata",
       "language_model_version": "chiakey-modern-2026.06.9",
-      "sha256": "f40793ca9df59b664e75708a971410120e470104c9c4d50b054294aa54859b7c",
-      "size": 22898,
+      "sha256": "08a5273ec140696bb8d41c36b0e27fcc24ecb04bd737300b067f36a476e76cab",
+      "size": 24706,
       "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/KeyKeySource-2026.06.9.json"
     },
     {
@@ -26,13 +26,13 @@
       "id": "smart-mandarin-checksums",
       "kind": "checksum",
       "language_model_version": "chiakey-modern-2026.06.9",
-      "sha256": "c3e9c4719be871bc215fecba26ed5fcc95e784f21a49b216d427b9008f889fd6",
+      "sha256": "5af4fdb41c758f932e10bd186d1db358957b3c0991e22d56b12857a5e10e623e",
       "size": 186,
       "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/SHA256SUMS"
     }
   ],
   "database_schema_version": 1,
-  "generated_at": "2026-06-24T06:27:01Z",
+  "generated_at": "2026-06-25T05:16:48Z",
   "minimum_app_version": "0.1.0",
   "schema": 1,
   "sources": [
@@ -156,6 +156,17 @@
       "priority": 305,
       "sha256": "bbd4f69e9c7ab489ba33f2daa56f2828306688cc954e8a289851f4f05fd6cc5c",
       "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiaki-web-overlay"
+    },
+    {
+      "attribution": "Chiaki.C",
+      "enabled": true,
+      "format": "tsv",
+      "id": "chiaki-synthetic-dialogue-overlay",
+      "license": "CC BY-NC 4.0; commercial use requires permission from Chiaki.C",
+      "name": "Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay",
+      "priority": 306,
+      "sha256": "3d8d4cf581dc4fb7f802bbc3806ab7f20b856a0169d7e0f021b9ec94927feb7f",
+      "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiaki-synthetic-dialogue-overlay"
     },
     {
       "attribution": "OpenCC contributors; ChiaKey Lexicon maintainers",
