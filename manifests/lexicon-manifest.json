@@ -6,8 +6,8 @@
       "id": "smart-mandarin-db",
       "kind": "keykey-source-db",
       "language_model_version": "chiakey-modern-2026.06.9",
-      "sha256": "748e1fd0681e0aae248854fa76a4a390c155465a838cecb5e704d2b3f147d0ff",
-      "size": 58433536,
+      "sha256": "1f41a52b05a0017d777f6242df776f76a6f063ff676f64c2cc3d71ad2274d286",
+      "size": 58392576,
       "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/KeyKeySource-2026.06.9.db"
     },
     {
@@ -16,7 +16,7 @@
       "id": "smart-mandarin-metadata",
       "kind": "metadata",
       "language_model_version": "chiakey-modern-2026.06.9",
-      "sha256": "85975481220158402168708d534a0119eb0818ae7b236b5dfc2a5939611b7455",
+      "sha256": "e66eb0362f1906760c5292c3e91b261f383a6924c7dab496b85604bf1748d847",
       "size": 25750,
       "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/KeyKeySource-2026.06.9.json"
     },
@@ -26,13 +26,13 @@
       "id": "smart-mandarin-checksums",
       "kind": "checksum",
       "language_model_version": "chiakey-modern-2026.06.9",
-      "sha256": "f3e047edc061f7ae8a11a44b188e282cdd7e87f8b86b9f49cd23afa18bee9dad",
+      "sha256": "1e26f016a481e27be6d1d15e992894553723994aa2e3db9a938653db7f8bada2",
       "size": 186,
       "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/SHA256SUMS"
     }
   ],
   "database_schema_version": 1,
-  "generated_at": "2026-06-25T06:46:27Z",
+  "generated_at": "2026-06-25T07:04:24Z",
   "minimum_app_version": "0.1.0",
   "schema": 1,
   "sources": [
@@ -154,7 +154,7 @@
       "license": "CC0-1.0",
       "name": "Chiaki reviewed web corpus overlay",
       "priority": 305,
-      "sha256": "bbd4f69e9c7ab489ba33f2daa56f2828306688cc954e8a289851f4f05fd6cc5c",
+      "sha256": "6406c0d39bdd9e5d06859d97fdd6100b23c1723840c9582e5c021bae980d1132",
       "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiaki-web-overlay"
     },
     {
