@@ -215,10 +215,12 @@ The generated source inventory is stored at:
 sources/chiaki-web-overlay/source-inventory.sha256
 ```
 
-### chiaki-synthetic-dialogue-overlay
+### chiaki-synthetic-overlay
 
 - Name: Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay
-- Local source: `sources/chiaki-synthetic-dialogue-overlay/unigrams.tsv`
+- Local sources:
+  - `sources/chiaki-synthetic-overlay/unigrams.tsv`
+  - `sources/chiaki-synthetic-overlay/bigrams.tsv`
 - Source material: GPT-5.5-generated synthetic "Taiwan internet usage" (台灣網路用語) corpus
 - License: CC BY-NC 4.0; commercial use requires permission from Chiaki.C
 - Attribution: Chiaki.C
@@ -231,7 +233,13 @@ redistributed in this repository; only the final lexicon rows are kept:
 
 ```text
 qstring<TAB>phrase<TAB>weight<TAB>tags
+qstring<TAB>previous<TAB>current<TAB>probability
 ```
+
+The bigram file is prefiltered against the release unigram table and keeps
+sentence-boundary rows using `!` / `$` qstring markers. Redundant synthetic
+rows and weak single-character pairings are removed conservatively before
+release.
 
 This source was generated as OpenAI output for which OpenAI assigns any OpenAI
 right, title, and interest in Output to the user, to the extent permitted by
@@ -241,7 +249,7 @@ it as my synthetic overlay data rather than as an external public-domain corpus.
 The generated source inventory is stored at:
 
 ```text
-sources/chiaki-synthetic-dialogue-overlay/source-inventory.sha256
+sources/chiaki-synthetic-overlay/source-inventory.sha256
 ```
 
 ## Excluded from v1

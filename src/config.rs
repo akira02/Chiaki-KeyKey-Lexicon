@@ -44,8 +44,8 @@ pub const OVERLAY_SOURCE_ID: &str = "chiakey-modern-overlay";
 pub const OVERLAY_SOURCE_NAME: &str = "ChiaKey modern overlay phrases";
 pub const CHIAKI_WEB_OVERLAY_SOURCE_ID: &str = "chiaki-web-overlay";
 pub const CHIAKI_WEB_OVERLAY_SOURCE_NAME: &str = "Chiaki reviewed web corpus overlay";
-pub const CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID: &str = "chiaki-synthetic-dialogue-overlay";
-pub const CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_NAME: &str =
+pub const CHIAKI_SYNTHETIC_SOURCE_ID: &str = "chiaki-synthetic-overlay";
+pub const CHIAKI_SYNTHETIC_SOURCE_NAME: &str =
     "Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay";
 pub const OPENCC_VARIANT_SOURCE_ID: &str = "opencc-variant-policy";
 pub const OPENCC_VARIANT_SOURCE_NAME: &str = "OpenCC-derived Traditional Chinese variant policy";

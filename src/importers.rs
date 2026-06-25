@@ -1,6 +1,6 @@
 use crate::config::{
-    Config, CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID, CHIAKI_WEB_OVERLAY_SOURCE_ID,
-    LIBCHEWING_SOURCE_ID, OVERLAY_SOURCE_ID, RIME_ESSAY_SOURCE_ID,
+    Config, CHIAKI_SYNTHETIC_SOURCE_ID, CHIAKI_WEB_OVERLAY_SOURCE_ID, LIBCHEWING_SOURCE_ID,
+    OVERLAY_SOURCE_ID, RIME_ESSAY_SOURCE_ID,
 };
 use crate::phonetics::{phrase_candidate, qstring_for_bpmf_sequence};
 use crate::types::{
@@ -303,11 +303,11 @@ pub fn parse_chiaki_web_overlay(
     parse_explicit_records(path, cfg, CHIAKI_WEB_OVERLAY_SOURCE_ID)
 }
 
-pub fn parse_chiaki_synthetic_dialogue_overlay(
+pub fn parse_chiaki_synthetic_overlay(
     path: &Path,
     cfg: &Config,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
-    parse_explicit_records(path, cfg, CHIAKI_SYNTHETIC_DIALOGUE_SOURCE_ID)
+    parse_explicit_records(path, cfg, CHIAKI_SYNTHETIC_SOURCE_ID)
 }
 
 pub fn parse_bigram_overlay(
@@ -329,8 +329,9 @@ pub fn parse_bigram_overlay(
         let parts = line.splitn(4, '\t').collect::<Vec<_>>();
         if parts.len() < 4
             || parts[0].is_empty()
-            || !phrase_candidate(parts[1], 1, cfg.max_phrase_codepoints)
-            || !phrase_candidate(parts[2], 1, cfg.max_phrase_codepoints)
+            || (parts[1].is_empty() && parts[2].is_empty())
+            || (!parts[1].is_empty() && !phrase_candidate(parts[1], 1, cfg.max_phrase_codepoints))
+            || (!parts[2].is_empty() && !phrase_candidate(parts[2], 1, cfg.max_phrase_codepoints))
         {
             skipped += 1;
             continue;
@@ -693,7 +694,8 @@ mod tests {
         );
         let cfg = test_config();
 
-        let (records, seen, skipped) = parse_bigram_overlay(&path, &cfg).unwrap();
+        let (mut records, seen, skipped) = parse_bigram_overlay(&path, &cfg).unwrap();
+        records.sort_by(|left, right| left.qstring.cmp(&right.qstring));
 
         assert_eq!(seen, 1);
         assert_eq!(skipped, 0);
@@ -702,6 +704,32 @@ mod tests {
         assert_eq!(records[0].previous, "個");
         assert_eq!(records[0].current, "人");
         assert_eq!(records[0].probability, -0.1);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn parses_bigram_overlay_boundary_rows() {
+        let path = temp_file(
+            "bigram-boundary-overlay",
+            "# qstring\tprevious\tcurrent\tprobability\n! rq\t\t個\t-0.3\nrq $\t個\t\t-0.4\n! $\t\t\t-0.5\n",
+        );
+        let cfg = test_config();
+
+        let (mut records, seen, skipped) = parse_bigram_overlay(&path, &cfg).unwrap();
+        records.sort_by(|left, right| left.qstring.cmp(&right.qstring));
+
+        assert_eq!(seen, 3);
+        assert_eq!(skipped, 1);
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].qstring, "! rq");
+        assert_eq!(records[0].previous, "");
+        assert_eq!(records[0].current, "個");
+        assert_eq!(records[0].probability, -0.3);
+        assert_eq!(records[1].qstring, "rq $");
+        assert_eq!(records[1].previous, "個");
+        assert_eq!(records[1].current, "");
+        assert_eq!(records[1].probability, -0.4);
 
         let _ = fs::remove_file(path);
     }

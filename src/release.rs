@@ -95,7 +95,7 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
-    import_chiaki_synthetic_dialogue_overlay(
+    import_chiaki_synthetic_overlay(
         &mut conn,
         &cfg,
         &paths,
@@ -109,6 +109,7 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
+    import_chiaki_synthetic_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
     import_chiaki_web_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
     import_punctuations(
         &mut conn,
@@ -188,7 +189,8 @@ fn verify_inputs(
         paths.overlay_explicit.clone(),
         paths.chiaki_web_overlay_explicit.clone(),
         paths.chiaki_web_overlay_bigrams.clone(),
-        paths.chiaki_synthetic_dialogue_unigrams.clone(),
+        paths.chiaki_synthetic_unigrams.clone(),
+        paths.chiaki_synthetic_bigrams.clone(),
         paths.opencc_variant_demotions.clone(),
         paths.rime_essay_raw.clone(),
     ];
@@ -213,7 +215,7 @@ fn create_output_dirs(cfg: &Config, paths: &ReleasePaths) -> Result<()> {
     fs::create_dir_all(&paths.rime_essay_source_dir)?;
     fs::create_dir_all(&paths.overlay_source_dir)?;
     fs::create_dir_all(&paths.chiaki_web_overlay_source_dir)?;
-    fs::create_dir_all(&paths.chiaki_synthetic_dialogue_source_dir)?;
+    fs::create_dir_all(&paths.chiaki_synthetic_source_dir)?;
     fs::create_dir_all(&paths.opencc_variant_source_dir)?;
     Ok(())
 }
@@ -298,9 +300,12 @@ fn write_source_inventories(
         true,
     )?;
     write_inventory(
-        &paths.chiaki_synthetic_dialogue_inventory,
-        &paths.chiaki_synthetic_dialogue_source_dir,
-        std::slice::from_ref(&paths.chiaki_synthetic_dialogue_unigrams),
+        &paths.chiaki_synthetic_inventory,
+        &paths.chiaki_synthetic_source_dir,
+        &[
+            paths.chiaki_synthetic_unigrams.clone(),
+            paths.chiaki_synthetic_bigrams.clone(),
+        ],
         true,
     )?;
     write_inventory(
@@ -765,23 +770,21 @@ fn import_chiaki_web_overlay(
     Ok(())
 }
 
-fn import_chiaki_synthetic_dialogue_overlay(
+fn import_chiaki_synthetic_overlay(
     conn: &mut Connection,
     cfg: &Config,
     paths: &ReleasePaths,
     source_keys: &mut HashMap<(String, String), SourceRecord>,
     import_results: &mut Vec<ImportResult>,
 ) -> Result<()> {
-    let (records, seen, skipped) = importers::parse_chiaki_synthetic_dialogue_overlay(
-        &paths.chiaki_synthetic_dialogue_unigrams,
-        cfg,
-    )?;
+    let (records, seen, skipped) =
+        importers::parse_chiaki_synthetic_overlay(&paths.chiaki_synthetic_unigrams, cfg)?;
     let result = db::apply_records(
         conn,
         records,
-        &repo_relative(&cfg.root, &paths.chiaki_synthetic_dialogue_unigrams)?,
-        "chiaki-synthetic-dialogue-unigrams",
-        &sha256_file(&paths.chiaki_synthetic_dialogue_unigrams)?,
+        &repo_relative(&cfg.root, &paths.chiaki_synthetic_unigrams)?,
+        "chiaki-synthetic-unigrams",
+        &sha256_file(&paths.chiaki_synthetic_unigrams)?,
         seen,
         skipped,
         false,
@@ -805,6 +808,27 @@ fn import_chiaki_web_bigrams(
         &repo_relative(&cfg.root, &paths.chiaki_web_overlay_bigrams)?,
         "chiaki-web-bigram-overlay",
         &sha256_file(&paths.chiaki_web_overlay_bigrams)?,
+        seen,
+        skipped,
+    )?;
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_chiaki_synthetic_bigrams(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, skipped) =
+        importers::parse_bigram_overlay(&paths.chiaki_synthetic_bigrams, cfg)?;
+    let result = db::apply_bigram_records(
+        conn,
+        &records,
+        &repo_relative(&cfg.root, &paths.chiaki_synthetic_bigrams)?,
+        "chiaki-synthetic-bigrams",
+        &sha256_file(&paths.chiaki_synthetic_bigrams)?,
         seen,
         skipped,
     )?;

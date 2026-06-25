@@ -62,8 +62,8 @@ Unknown-license data must not be included in public release artifacts.
 
 ### Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay
 
-- Source id: `chiaki-synthetic-dialogue-overlay`
-- License file: [chiaki-synthetic-dialogue-overlay-NC.txt](chiaki-synthetic-dialogue-overlay-NC.txt)
+- Source id: `chiaki-synthetic-overlay`
+- License file: [chiaki-synthetic-overlay-NC.txt](chiaki-synthetic-overlay-NC.txt)
 - Review notes: [Docs/SourceReview.md](../Docs/SourceReview.md)
 - Release decision: included starting in the next synthetic Taiwan internet usage overlay refresh
 - Note: licensed under CC BY-NC 4.0; non-commercial and open-source projects may use this source, but commercial use requires permission from Chiaki.C
