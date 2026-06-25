@@ -38,6 +38,121 @@ manifest 記錄的是該 inventory file 的 SHA-256，而不是單一 upstream a
 
 `source-inventory.sha256` 保留作為 vendored cooked database 的 provenance。完整 KeyKey Boneyard tree 不會複製到這個 repository。
 
+## 自 2026.06.2 起納入
+
+### chiakey-modern-overlay
+
+- 名稱：ChiaKey modern overlay phrases
+- 本地來源：
+  - `sources/chiakey-modern-overlay/phrases.tsv`
+  - `sources/chiakey-modern-overlay/explicit.tsv`
+- 授權：CC0-1.0
+- 署名：ChiaKey Lexicon maintainers
+- 再散布決策：納入公開 release
+
+這個來源刻意保持小型且由專案自有維護。它用於實測時發現的明顯 seed lexicon 缺漏，例如不應等未來大型 frequency corpus 才補上的基本輸入法用語。
+
+`phrases.tsv` 讓 release builder 從單字資料推導 readings。`explicit.tsv` 則用於依賴特定 KeyKey qstring 的修正，例如為 neutral-tone `ㄍㄜ˙` / `ek7` 提升 `個`。
+
+## 自 2026.06.3 起納入
+
+### libchewing-data
+
+- 名稱：libchewing-data Traditional Chinese Zhuyin dictionary
+- 本地來源：`sources/libchewing-data/raw/`
+- 上游 release：<https://github.com/chewing/libchewing-data/releases/tag/v2026.3.22>
+- 目前上游 home：<https://codeberg.org/chewing/libchewing-data>
+- 授權：LGPL-2.1-or-later
+- 署名：libchewing Core Team
+- 再散布決策：自 `2026.06.3` 起納入公開 release
+
+release builder 匯入這些 pinned files：
+
+- `dict/chewing/tsi.csv`
+- `dict/chewing/alt.csv`
+- `dict/chewing/word.csv`
+
+`tsi.csv` 與 `alt.csv` 會作為主要現代詞彙層匯入，因為它們包含明確注音讀音。對 libchewing-data 中存在的詞，builder 會用 libchewing 的明確讀音取代 bootstrap database 中較舊的推導讀音。`word.csv` 只用來補缺少的單字讀音。
+
+自 `2026.06.5` 起，`tsi.csv` 中的單字 rows 也會匯入作為 character-frequency correction layer。這讓 `我` 等常用字保留 libchewing 頻率，而不是與 bootstrap database 中同讀音的罕用字 tie。
+character-frequency mapping 會保留一個小型 single-character segmentation penalty，避免常用字意外超過同讀音的明確詞彙 rows。
+較低排序的 libchewing 多字 rows 也會取得 bounded segment bonus，讓 `地基`、`權重` 這類已知詞能高於同讀音的逐字切分，同時不把原本已強的詞推過 phrase scale 的上緣。
+當多個高頻 libchewing phrase 都以同一個字與同一讀音開頭時，weak single-character readings 也可被提升。這能讓 `數` / `ㄕㄨˋ` 這類讀音依據 `數位`、`數學`、`數量`、`數字` 等詞的證據出現在候選列表，同時仍保持在最強 phrase evidence 之下。
+
+最終 release database 也會從組裝完成的 `unigrams` table 派生 `associated_phrases`，供 runtime associated-phrase module 使用。每列會把已 commit 的 head character 映射到 comma-separated phrase tails，所以 commit `我` 後可以提示 `們`、`的` 等 tails。這張表會在所有 lexical imports 與 policy layers 套用後產生，release 完成前也會驗證代表性 rows。
+
+raw files vendored 於 `sources/libchewing-data/raw/`，所以 release builds 不需要 network access。maintainers 可用以下指令刷新 pinned snapshots：
+
+```text
+cargo run --release -- fetch-modern-sources
+```
+
+產生的 source inventory 存放於：
+
+```text
+sources/libchewing-data/source-inventory.sha256
+```
+
+### rime-essay
+
+- 名稱：Rime essay shared vocabulary and language model
+- 本地來源：`sources/rime-essay/raw/essay.txt`
+- 上游 commit：<https://github.com/rime/rime-essay/tree/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed>
+- 授權：LGPL-3.0
+- 署名：Rime essay contributors
+- 再散布決策：自 `2026.06.3` 起納入公開 release
+
+Rime essay 有可用的現代詞彙與分數，但不包含注音讀音。因此 release builder 只會在另一個來源已提供讀音後使用它。
+
+首先，overlap rerank pass 會用 Rime scores 提升同一 KeyKey qstring group 內的既有候選。這個 pass 只會把較低排序的候選提升到足以尊重 Rime ordering，不會 demote 既有 rows，也會限制 promotion，避免 Rime 把 ambiguous candidate 推過既有高頻詞範圍。
+
+接著，低優先補充詞 pass 會匯入符合以下條件的 entries：
+
+1. 該詞在 libchewing-data 匯入後尚不存在。
+2. 詞長介於 2 到 7 個 Unicode codepoints。
+3. Rime score 至少為 `40`。
+4. 每個字在目前 database 中都有 primary single-character reading。
+
+在這個補充 pass 中，原本會低於既有 split path 的 entries 會被提升到剛好超過該 split，並以 Rime supplemental range 的上緣為 cap。這讓 `趁現在` 這類完整詞能比 `稱` + `現在` 這種不太可能的字詞切分取得小幅 segmentation advantage，而不需要 per-phrase explicit overrides。
+
+這能避免用推導讀音取代 libchewing 的明確注音資料，同時在讀音能安全推導到足以作為補充層時，加入社群、新聞、科技等現代詞彙。
+
+產生的 source inventory 存放於：
+
+```text
+sources/rime-essay/source-inventory.sha256
+```
+
+## 自 2026.06.5 起納入
+
+### bpmf-ext-cin
+
+- 名稱：Public domain extended BPMF character table
+- 本地來源：`sources/bpmf-ext-cin/vendor/bpmf-ext.cin`
+- 上游來源檔：<https://github.com/vChewing/KeyKey-Boneyard/blob/master/YahooKeyKey-Source-1.1.2528/DataTables/bpmf-ext.cin>
+- 授權：Public Domain，依來源檔 header
+- 署名：opendesktop.org.tw phone.cin contributors; KeyKey Boneyard maintainers
+- 再散布決策：自 `2026.06.5` 起納入公開 release
+
+這個來源會在 libchewing-data 之後、Rime essay 之前匯入。release builder 只把它當作低優先的單字讀音補充：
+
+1. 只匯入 CJK BMP 字元。
+2. 排除 non-BMP 與 private-use 字元。
+3. 只加入缺少的 exact `(reading, character)` pairs。
+4. 不覆蓋 libchewing character frequencies。
+
+這會補齊 native/Yahoo character coverage gaps，例如 `ㄨㄛˇ` 候選集合：
+
+```text
+我 婐 捰 倭 䂺 婑 䰀 㦱
+```
+
+產生的 source inventory 存放於：
+
+```text
+sources/bpmf-ext-cin/source-inventory.sha256
+```
+
 ## 自 2026.06.6 起納入
 
 ### keykey-punctuations-cin
@@ -109,6 +224,21 @@ BopomofoCorrection-bopomofo-correction-cin
 ```text
 sources/keykey-module-cin/source-inventory.sha256
 ```
+
+## 自 2026.06.7 起納入
+
+### opencc-variant-policy
+
+- 名稱：OpenCC-derived Traditional Chinese variant policy
+- 本地來源：`sources/opencc-variant-policy/variant-demotions.tsv`
+- 上游參考：<https://github.com/BYVoid/OpenCC>
+- 授權：Apache-2.0-derived policy
+- 署名：OpenCC contributors; ChiaKey Lexicon maintainers
+- 再散布決策：自 `2026.06.7` 起納入公開 release
+
+這個來源是由 OpenCC 簡繁轉換知識衍生的小型 reviewed policy table。它不會被當作 frequency dictionary 匯入；release builder 只在簡體或非台灣偏好的 variants 原本會與繁體候選 tie 時降低其排序。
+
+第一列會降低 `个`，也就是 `個` 的簡體 counterpart，讓 neutral-tone `ㄍㄜ˙` / `ek7` 不會只因 tie-break 排在 `個` 前面。
 
 ## 自 2026.06.9 起納入
 
@@ -234,134 +364,6 @@ sources/openformosa-common-voice-25-zh-tw/source-inventory.sha256
 - CC-CEDICT、moedict、Wikimedia、Tatoeba、wordfreq、SUBTLEX-CH、Google Books Ngram、Google Chinese Web 5-gram。
 
 部分繼承自開放 KeyKey Boneyard tree 的 bootstrap files 有 `Yahoo.txt` 或 `SinicaCorpusOverrides.txt` 這類歷史名稱。在 v1 中，這些檔案視為 BSD-style Boneyard bootstrap source 的一部分。repository 不會複製私有 raw Yahoo search logs、Sinica corpus files 或 CEROD binaries。
-
-## 自 2026.06.2 起納入
-
-### chiakey-modern-overlay
-
-- 名稱：ChiaKey modern overlay phrases
-- 本地來源：
-  - `sources/chiakey-modern-overlay/phrases.tsv`
-  - `sources/chiakey-modern-overlay/explicit.tsv`
-- 授權：CC0-1.0
-- 署名：ChiaKey Lexicon maintainers
-- 再散布決策：納入公開 release
-
-這個來源刻意保持小型且由專案自有維護。它用於實測時發現的明顯 seed lexicon 缺漏，例如不應等未來大型 frequency corpus 才補上的基本輸入法用語。
-
-`phrases.tsv` 讓 release builder 從單字資料推導 readings。`explicit.tsv` 則用於依賴特定 KeyKey qstring 的修正，例如為 neutral-tone `ㄍㄜ˙` / `ek7` 提升 `個`。
-
-## 自 2026.06.7 起納入
-
-### opencc-variant-policy
-
-- 名稱：OpenCC-derived Traditional Chinese variant policy
-- 本地來源：`sources/opencc-variant-policy/variant-demotions.tsv`
-- 上游參考：<https://github.com/BYVoid/OpenCC>
-- 授權：Apache-2.0-derived policy
-- 署名：OpenCC contributors; ChiaKey Lexicon maintainers
-- 再散布決策：自 `2026.06.7` 起納入公開 release
-
-這個來源是由 OpenCC 簡繁轉換知識衍生的小型 reviewed policy table。它不會被當作 frequency dictionary 匯入；release builder 只在簡體或非台灣偏好的 variants 原本會與繁體候選 tie 時降低其排序。
-
-第一列會降低 `个`，也就是 `個` 的簡體 counterpart，讓 neutral-tone `ㄍㄜ˙` / `ek7` 不會只因 tie-break 排在 `個` 前面。
-
-## 自 2026.06.3 起納入
-
-### libchewing-data
-
-- 名稱：libchewing-data Traditional Chinese Zhuyin dictionary
-- 本地來源：`sources/libchewing-data/raw/`
-- 上游 release：<https://github.com/chewing/libchewing-data/releases/tag/v2026.3.22>
-- 目前上游 home：<https://codeberg.org/chewing/libchewing-data>
-- 授權：LGPL-2.1-or-later
-- 署名：libchewing Core Team
-- 再散布決策：自 `2026.06.3` 起納入公開 release
-
-release builder 匯入這些 pinned files：
-
-- `dict/chewing/tsi.csv`
-- `dict/chewing/alt.csv`
-- `dict/chewing/word.csv`
-
-`tsi.csv` 與 `alt.csv` 會作為主要現代詞彙層匯入，因為它們包含明確注音讀音。對 libchewing-data 中存在的詞，builder 會用 libchewing 的明確讀音取代 bootstrap database 中較舊的推導讀音。`word.csv` 只用來補缺少的單字讀音。
-
-自 `2026.06.5` 起，`tsi.csv` 中的單字 rows 也會匯入作為 character-frequency correction layer。這讓 `我` 等常用字保留 libchewing 頻率，而不是與 bootstrap database 中同讀音的罕用字 tie。
-character-frequency mapping 會保留一個小型 single-character segmentation penalty，避免常用字意外超過同讀音的明確詞彙 rows。
-較低排序的 libchewing 多字 rows 也會取得 bounded segment bonus，讓 `地基`、`權重` 這類已知詞能高於同讀音的逐字切分，同時不把原本已強的詞推過 phrase scale 的上緣。
-當多個高頻 libchewing phrase 都以同一個字與同一讀音開頭時，weak single-character readings 也可被提升。這能讓 `數` / `ㄕㄨˋ` 這類讀音依據 `數位`、`數學`、`數量`、`數字` 等詞的證據出現在候選列表，同時仍保持在最強 phrase evidence 之下。
-
-最終 release database 也會從組裝完成的 `unigrams` table 派生 `associated_phrases`，供 runtime associated-phrase module 使用。每列會把已 commit 的 head character 映射到 comma-separated phrase tails，所以 commit `我` 後可以提示 `們`、`的` 等 tails。這張表會在所有 lexical imports 與 policy layers 套用後產生，release 完成前也會驗證代表性 rows。
-
-raw files vendored 於 `sources/libchewing-data/raw/`，所以 release builds 不需要 network access。maintainers 可用以下指令刷新 pinned snapshots：
-
-```text
-cargo run --release -- fetch-modern-sources
-```
-
-產生的 source inventory 存放於：
-
-```text
-sources/libchewing-data/source-inventory.sha256
-```
-
-### bpmf-ext-cin
-
-- 名稱：Public domain extended BPMF character table
-- 本地來源：`sources/bpmf-ext-cin/vendor/bpmf-ext.cin`
-- 上游來源檔：<https://github.com/vChewing/KeyKey-Boneyard/blob/master/YahooKeyKey-Source-1.1.2528/DataTables/bpmf-ext.cin>
-- 授權：Public Domain，依來源檔 header
-- 署名：opendesktop.org.tw phone.cin contributors; KeyKey Boneyard maintainers
-- 再散布決策：自 `2026.06.5` 起納入公開 release
-
-這個來源會在 libchewing-data 之後、Rime essay 之前匯入。release builder 只把它當作低優先的單字讀音補充：
-
-1. 只匯入 CJK BMP 字元。
-2. 排除 non-BMP 與 private-use 字元。
-3. 只加入缺少的 exact `(reading, character)` pairs。
-4. 不覆蓋 libchewing character frequencies。
-
-這會補齊 native/Yahoo character coverage gaps，例如 `ㄨㄛˇ` 候選集合：
-
-```text
-我 婐 捰 倭 䂺 婑 䰀 㦱
-```
-
-產生的 source inventory 存放於：
-
-```text
-sources/bpmf-ext-cin/source-inventory.sha256
-```
-
-### rime-essay
-
-- 名稱：Rime essay shared vocabulary and language model
-- 本地來源：`sources/rime-essay/raw/essay.txt`
-- 上游 commit：<https://github.com/rime/rime-essay/tree/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed>
-- 授權：LGPL-3.0
-- 署名：Rime essay contributors
-- 再散布決策：自 `2026.06.3` 起納入公開 release
-
-Rime essay 有可用的現代詞彙與分數，但不包含注音讀音。因此 release builder 只會在另一個來源已提供讀音後使用它。
-
-首先，overlap rerank pass 會用 Rime scores 提升同一 KeyKey qstring group 內的既有候選。這個 pass 只會把較低排序的候選提升到足以尊重 Rime ordering，不會 demote 既有 rows，也會限制 promotion，避免 Rime 把 ambiguous candidate 推過既有高頻詞範圍。
-
-接著，低優先補充詞 pass 會匯入符合以下條件的 entries：
-
-1. 該詞在 libchewing-data 匯入後尚不存在。
-2. 詞長介於 2 到 7 個 Unicode codepoints。
-3. Rime score 至少為 `40`。
-4. 每個字在目前 database 中都有 primary single-character reading。
-
-在這個補充 pass 中，原本會低於既有 split path 的 entries 會被提升到剛好超過該 split，並以 Rime supplemental range 的上緣為 cap。這讓 `趁現在` 這類完整詞能比 `稱` + `現在` 這種不太可能的字詞切分取得小幅 segmentation advantage，而不需要 per-phrase explicit overrides。
-
-這能避免用推導讀音取代 libchewing 的明確注音資料，同時在讀音能安全推導到足以作為補充層時，加入社群、新聞、科技等現代詞彙。
-
-產生的 source inventory 存放於：
-
-```text
-sources/rime-essay/source-inventory.sha256
-```
 
 ## 讀音格式
 
