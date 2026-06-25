@@ -1,10 +1,17 @@
 .DS_Store
 
 # Generated outputs.
+generated/
 normalized/smart-mandarin.tsv
 Build/
 tmp/
 target/
+
+# Local corpus experiments. Review and release derived TSV values, not raw text snapshots.
+sources/fineweb2-*/
+sources/openformosa-common-voice-*/
+sources/taiwan-gov-news-*/
+sources/zh-tw-wikipedia-*/
 
 # Local release staging. Final artifacts should be uploaded to GitHub Releases.
 dist/

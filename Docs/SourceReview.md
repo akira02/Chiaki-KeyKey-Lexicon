@@ -180,6 +180,36 @@ The generated source inventory is stored at:
 sources/mozc-emoticon-data/source-inventory.sha256
 ```
 
+### chiaki-web-overlay
+
+- Name: Chiaki reviewed web corpus overlay
+- Local sources:
+  - `sources/chiaki-web-overlay/explicit.tsv`
+  - `sources/chiaki-web-overlay/bigrams.tsv`
+- Source material: Traditional Chinese Wikipedia and Chiaki's own social media posts
+- License: CC0-1.0
+- Attribution: ChiaKey Lexicon maintainers
+- Redistribution decision: included for public releases starting in the next corpus refresh
+
+This source contains reviewed unigram and bigram values derived outside the
+repository. It redistributes only the final lexicon rows in the release-builder
+formats:
+
+```text
+qstring<TAB>phrase<TAB>weight<TAB>tags
+qstring<TAB>previous<TAB>current<TAB>probability
+```
+
+The release builder imports unigram rows after `chiakey-modern-overlay` and
+before `opencc-variant-policy`. Bigram rows are imported into the runtime
+`bigrams` table after unigram policies have been applied.
+
+The generated source inventory is stored at:
+
+```text
+sources/chiaki-web-overlay/source-inventory.sha256
+```
+
 ## Excluded from v1
 
 These sources are useful references, but they are not included as raw sources in the first release artifacts:

@@ -147,6 +147,17 @@
       "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiakey-modern-overlay"
     },
     {
+      "attribution": "ChiaKey Lexicon maintainers",
+      "enabled": true,
+      "format": "tsv",
+      "id": "chiaki-web-overlay",
+      "license": "CC0-1.0",
+      "name": "Chiaki reviewed web corpus overlay",
+      "priority": 305,
+      "sha256": "bbd4f69e9c7ab489ba33f2daa56f2828306688cc954e8a289851f4f05fd6cc5c",
+      "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiaki-web-overlay"
+    },
+    {
       "attribution": "OpenCC contributors; ChiaKey Lexicon maintainers",
       "enabled": true,
       "format": "tsv",

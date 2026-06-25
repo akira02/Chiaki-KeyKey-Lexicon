@@ -1,6 +1,11 @@
-use crate::config::{Config, LIBCHEWING_SOURCE_ID, OVERLAY_SOURCE_ID, RIME_ESSAY_SOURCE_ID};
+use crate::config::{
+    Config, CHIAKI_WEB_OVERLAY_SOURCE_ID, LIBCHEWING_SOURCE_ID, OVERLAY_SOURCE_ID,
+    RIME_ESSAY_SOURCE_ID,
+};
 use crate::phonetics::{phrase_candidate, qstring_for_bpmf_sequence};
-use crate::types::{LibchewingFile, LibchewingWeightMode, SourceRecord, VariantDemotionRecord};
+use crate::types::{
+    BigramRecord, LibchewingFile, LibchewingWeightMode, SourceRecord, VariantDemotionRecord,
+};
 use anyhow::{bail, Context, Result};
 use csv::StringRecord;
 use std::collections::{HashMap, HashSet};
@@ -17,6 +22,7 @@ const LIBCHEWING_CHARACTER_PHRASE_EVIDENCE_PENALTY: f64 = 1.0;
 const LIBCHEWING_CHARACTER_PHRASE_EVIDENCE_MAX_WEIGHT: f64 = -1.35;
 const RIME_OVERLAP_RERANK_MARGIN: f64 = 0.01;
 const RIME_OVERLAP_RERANK_MAX_WEIGHT: f64 = -0.5;
+const RIME_OVERLAP_RERANK_STRONG_GROUP_THRESHOLD: f64 = -0.75;
 const RIME_SPLIT_RERANK_MARGIN: f64 = 0.01;
 const RIME_SPLIT_RERANK_MAX_WEIGHT: f64 = -1.35;
 
@@ -210,6 +216,11 @@ pub fn parse_rime_overlap_reranks(
         if group.len() < 2 {
             continue;
         }
+        if group.iter().any(|(_phrase, current_weight, _score)| {
+            *current_weight >= RIME_OVERLAP_RERANK_STRONG_GROUP_THRESHOLD
+        }) {
+            continue;
+        }
         group.sort_by(|left, right| left.2.cmp(&right.2).then_with(|| left.0.cmp(&right.0)));
 
         let mut floor = f64::NEG_INFINITY;
@@ -282,6 +293,71 @@ pub fn parse_explicit_overlay(
     path: &Path,
     cfg: &Config,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    parse_explicit_records(path, cfg, OVERLAY_SOURCE_ID)
+}
+
+pub fn parse_chiaki_web_overlay(
+    path: &Path,
+    cfg: &Config,
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    parse_explicit_records(path, cfg, CHIAKI_WEB_OVERLAY_SOURCE_ID)
+}
+
+pub fn parse_bigram_overlay(
+    path: &Path,
+    cfg: &Config,
+) -> Result<(Vec<BigramRecord>, usize, usize)> {
+    let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
+    let reader = BufReader::new(file);
+    let mut seen = 0;
+    let mut skipped = 0;
+    let mut records = Vec::new();
+
+    for (line_number, line) in reader.lines().enumerate() {
+        let line = line?;
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        seen += 1;
+        let parts = line.splitn(4, '\t').collect::<Vec<_>>();
+        if parts.len() < 4
+            || parts[0].is_empty()
+            || !phrase_candidate(parts[1], 1, cfg.max_phrase_codepoints)
+            || !phrase_candidate(parts[2], 1, cfg.max_phrase_codepoints)
+        {
+            skipped += 1;
+            continue;
+        }
+        let probability: f64 = parts[3].parse().with_context(|| {
+            format!(
+                "invalid bigram probability {}:{}",
+                path.display(),
+                line_number + 1
+            )
+        })?;
+        if !probability.is_finite() {
+            bail!(
+                "invalid non-finite bigram probability {}:{}",
+                path.display(),
+                line_number + 1
+            );
+        }
+        records.push(BigramRecord {
+            qstring: parts[0].to_string(),
+            previous: parts[1].to_string(),
+            current: parts[2].to_string(),
+            probability,
+        });
+    }
+
+    Ok((dedupe_bigram_records(records), seen, skipped))
+}
+
+fn parse_explicit_records(
+    path: &Path,
+    cfg: &Config,
+    source_id: &'static str,
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
     let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
     let reader = BufReader::new(file);
     let mut seen = 0;
@@ -313,7 +389,7 @@ pub fn parse_explicit_overlay(
             qstring: parts[0].to_string(),
             phrase: parts[1].to_string(),
             weight,
-            source_id: OVERLAY_SOURCE_ID,
+            source_id,
             tags: format!("unigram,{}", parts[3]),
         });
     }
@@ -439,6 +515,24 @@ pub fn dedupe_records(records: Vec<SourceRecord>) -> Vec<SourceRecord> {
     map.into_values().collect()
 }
 
+pub fn dedupe_bigram_records(records: Vec<BigramRecord>) -> Vec<BigramRecord> {
+    let mut map: HashMap<(String, String, String), BigramRecord> = HashMap::new();
+    for record in records {
+        let key = (
+            record.qstring.clone(),
+            record.previous.clone(),
+            record.current.clone(),
+        );
+        match map.get(&key) {
+            Some(existing) if existing.probability >= record.probability => {}
+            _ => {
+                map.insert(key, record);
+            }
+        }
+    }
+    map.into_values().collect()
+}
+
 pub fn format_weight(value: f64) -> String {
     if value.fract() == 0.0 {
         format!("{value:.1}")
@@ -552,8 +646,9 @@ fn round6(value: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        libchewing_character_weight, libchewing_weight, parse_explicit_overlay, parse_rime_essay,
-        parse_rime_overlap_reranks, parse_variant_demotions, phrase_evidence_character_records,
+        libchewing_character_weight, libchewing_weight, parse_bigram_overlay,
+        parse_explicit_overlay, parse_rime_essay, parse_rime_overlap_reranks,
+        parse_variant_demotions, phrase_evidence_character_records,
         LIBCHEWING_PHRASE_SEGMENT_BONUS, LIBCHEWING_PHRASE_SEGMENT_BONUS_THRESHOLD,
         RIME_OVERLAP_RERANK_MARGIN,
     };
@@ -579,6 +674,27 @@ mod tests {
         assert_eq!(records[0].phrase, "個");
         assert_eq!(records[0].weight, -2.9);
         assert_eq!(records[0].tags, "unigram,manual,neutral-tone");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn parses_bigram_overlay_rows() {
+        let path = temp_file(
+            "bigram-overlay",
+            "# qstring\tprevious\tcurrent\tprobability\nrq t4\t個\t人\t-0.1\n",
+        );
+        let cfg = test_config();
+
+        let (records, seen, skipped) = parse_bigram_overlay(&path, &cfg).unwrap();
+
+        assert_eq!(seen, 1);
+        assert_eq!(skipped, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].qstring, "rq t4");
+        assert_eq!(records[0].previous, "個");
+        assert_eq!(records[0].current, "人");
+        assert_eq!(records[0].probability, -0.1);
 
         let _ = fs::remove_file(path);
     }
@@ -737,6 +853,31 @@ mod tests {
         assert_eq!(records[0].phrase, "會選");
         assert_eq!(records[0].weight, -0.885961 + RIME_OVERLAP_RERANK_MARGIN);
         assert_eq!(records[0].tags, "unigram,rime-essay,overlap-rerank");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn keeps_same_qstring_groups_with_strong_candidates_on_libchewing_order() {
+        let path = temp_file(
+            "rime-overlap-strong",
+            "市立\t618\n視力\t3937\n示例\t3448\n事例\t1210\n勢利\t752\n勢力\t10221\n",
+        );
+        let cfg = test_config();
+        let existing = vec![
+            ("0_=_".to_string(), "市立".to_string(), -0.549893),
+            ("0_=_".to_string(), "視力".to_string(), -0.549936),
+            ("0_=_".to_string(), "勢利".to_string(), -0.549936),
+            ("0_=_".to_string(), "勢力".to_string(), -0.549936),
+            ("0_=_".to_string(), "示例".to_string(), -1.306103),
+            ("0_=_".to_string(), "事例".to_string(), -1.306103),
+        ];
+
+        let (records, seen, skipped) = parse_rime_overlap_reranks(&path, &cfg, &existing).unwrap();
+
+        assert_eq!(seen, 6);
+        assert_eq!(skipped, 0);
+        assert!(records.is_empty());
 
         let _ = fs::remove_file(path);
     }
