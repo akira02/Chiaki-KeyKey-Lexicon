@@ -1,6 +1,6 @@
 use crate::config::{
-    Config, CHIAKI_SYNTHETIC_SOURCE_ID, CHIAKI_WEB_OVERLAY_SOURCE_ID, LIBCHEWING_SOURCE_ID,
-    OVERLAY_SOURCE_ID, RIME_ESSAY_SOURCE_ID,
+    Config, CHIAKEY_AUTO_HOTWORDS_SOURCE_ID, CHIAKI_SYNTHETIC_SOURCE_ID,
+    CHIAKI_WEB_OVERLAY_SOURCE_ID, LIBCHEWING_SOURCE_ID, OVERLAY_SOURCE_ID, RIME_ESSAY_SOURCE_ID,
 };
 use crate::phonetics::{phrase_candidate, qstring_for_bpmf_sequence};
 use crate::types::{
@@ -253,6 +253,21 @@ pub fn parse_rime_overlap_reranks(
 }
 
 pub fn parse_overlay(path: &Path, cfg: &Config) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    parse_overlay_records(path, cfg, OVERLAY_SOURCE_ID)
+}
+
+pub fn parse_auto_hotwords_overlay(
+    path: &Path,
+    cfg: &Config,
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    parse_overlay_records(path, cfg, CHIAKEY_AUTO_HOTWORDS_SOURCE_ID)
+}
+
+fn parse_overlay_records(
+    path: &Path,
+    cfg: &Config,
+    source_id: &'static str,
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
     let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
     let reader = BufReader::new(file);
     let mut seen = 0;
@@ -281,7 +296,7 @@ pub fn parse_overlay(path: &Path, cfg: &Config) -> Result<(Vec<SourceRecord>, us
             qstring: String::new(),
             phrase: parts[0].to_string(),
             weight,
-            source_id: OVERLAY_SOURCE_ID,
+            source_id,
             tags: format!("unigram,{}", parts[2]),
         });
     }

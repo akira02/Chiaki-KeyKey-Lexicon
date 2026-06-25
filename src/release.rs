@@ -102,6 +102,13 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
+    import_chiakey_auto_hotwords_overlay(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
     import_opencc_variant_policy(
         &mut conn,
         &cfg,
@@ -192,6 +199,8 @@ fn verify_inputs(
         paths.chiaki_web_overlay_bigrams.clone(),
         paths.chiaki_synthetic_unigrams.clone(),
         paths.chiaki_synthetic_bigrams.clone(),
+        paths.chiakey_auto_hotwords_phrases.clone(),
+        paths.chiakey_auto_hotwords_state.clone(),
         paths.openformosa_common_voice_bigrams.clone(),
         paths.opencc_variant_demotions.clone(),
         paths.rime_essay_raw.clone(),
@@ -218,6 +227,7 @@ fn create_output_dirs(cfg: &Config, paths: &ReleasePaths) -> Result<()> {
     fs::create_dir_all(&paths.overlay_source_dir)?;
     fs::create_dir_all(&paths.chiaki_web_overlay_source_dir)?;
     fs::create_dir_all(&paths.chiaki_synthetic_source_dir)?;
+    fs::create_dir_all(&paths.chiakey_auto_hotwords_source_dir)?;
     fs::create_dir_all(&paths.openformosa_common_voice_source_dir)?;
     fs::create_dir_all(&paths.opencc_variant_source_dir)?;
     Ok(())
@@ -308,6 +318,15 @@ fn write_source_inventories(
         &[
             paths.chiaki_synthetic_unigrams.clone(),
             paths.chiaki_synthetic_bigrams.clone(),
+        ],
+        true,
+    )?;
+    write_inventory(
+        &paths.chiakey_auto_hotwords_inventory,
+        &paths.chiakey_auto_hotwords_source_dir,
+        &[
+            paths.chiakey_auto_hotwords_phrases.clone(),
+            paths.chiakey_auto_hotwords_state.clone(),
         ],
         true,
     )?;
@@ -796,6 +815,32 @@ fn import_chiaki_synthetic_overlay(
         &sha256_file(&paths.chiaki_synthetic_unigrams)?,
         seen,
         skipped,
+        false,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_chiakey_auto_hotwords_overlay(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, parse_skipped) =
+        importers::parse_auto_hotwords_overlay(&paths.chiakey_auto_hotwords_phrases, cfg)?;
+    let (records, infer_skipped) =
+        importers::infer_overlay_qstrings(records, &db::load_primary_character_readings(conn)?);
+    let result = db::apply_records(
+        conn,
+        records,
+        &repo_relative(&cfg.root, &paths.chiakey_auto_hotwords_phrases)?,
+        "chiakey-auto-hotwords",
+        &sha256_file(&paths.chiakey_auto_hotwords_phrases)?,
+        seen,
+        parse_skipped + infer_skipped,
         false,
     )?;
     remember_records(source_keys, &result);

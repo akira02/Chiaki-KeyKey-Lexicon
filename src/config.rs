@@ -47,6 +47,9 @@ pub const CHIAKI_WEB_OVERLAY_SOURCE_NAME: &str = "Chiaki reviewed web corpus ove
 pub const CHIAKI_SYNTHETIC_SOURCE_ID: &str = "chiaki-synthetic-overlay";
 pub const CHIAKI_SYNTHETIC_SOURCE_NAME: &str =
     "Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay";
+pub const CHIAKEY_AUTO_HOTWORDS_SOURCE_ID: &str = "chiakey-auto-hotwords-overlay";
+pub const CHIAKEY_AUTO_HOTWORDS_SOURCE_NAME: &str =
+    "ChiaKey automatically refreshed hotwords overlay";
 pub const OPENFORMOSA_COMMON_VOICE_SOURCE_ID: &str = "openformosa-common-voice-25-zh-tw";
 pub const OPENFORMOSA_COMMON_VOICE_SOURCE_NAME: &str =
     "OpenFormosa Common Voice 25 zh-TW bigram overlay";

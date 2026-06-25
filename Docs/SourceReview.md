@@ -240,6 +240,38 @@ sources/keykey-module-cin/source-inventory.sha256
 
 第一列會降低 `个`，也就是 `個` 的簡體 counterpart，讓 neutral-tone `ㄍㄜ˙` / `ek7` 不會只因 tie-break 排在 `個` 前面。
 
+## 自 2026.06.8 起納入
+
+### chiakey-auto-hotwords-overlay
+
+- 名稱：ChiaKey automatically refreshed hotwords overlay
+- 本地來源：
+  - `sources/chiakey-auto-hotwords-overlay/phrases.tsv`
+  - `sources/chiakey-auto-hotwords-overlay/state.json`
+- 授權：CC0-1.0 for the generated overlay rows maintained in this repository
+- 署名：ChiaKey Lexicon maintainers
+- 再散布決策：納入公開 release
+
+這個來源是自動維護的短期熱詞補充層。Google Trends 只作為 discovery signal；
+daily collector 會查詢 24 小時、48 小時與 7 天 trending windows，並把最小化、
+正規化後的 observations 存成 GitHub Actions artifacts。weekly refresh 才會彙整狀態
+並寫出本 repository 自有的 `phrases.tsv`。
+
+repository 不保存 Google Trends 的原始 CSV、排名表、新聞摘要或完整 related queries。
+`state.json` 只保存每個候選詞的最小聚合狀態，例如 `first_seen`、`last_seen`、
+`seen_dates` 與 `max_traffic`，用於自動權重與過期清理。
+
+自動收詞規則刻意保守：
+
+1. 只保留正規化後的純漢字詞。
+2. 排除英數、5 字以上詞、查詢型詞。
+3. 排除本地詞庫已存在的詞。
+4. 排除已可由 top-ranked 既有 segments 打出的詞。
+5. 排除無法從既有單字讀音推導 qstring 的詞。
+6. 7 天 window 只作為佐證；單一 `7d` observation 不會自行進入 overlay。
+
+這個來源的 rows 會隨時間自動衰退與移除，不應視為人工審核或永久詞彙層。
+
 ## 自 2026.06.9 起納入
 
 ### chiakey-symbols-overlay

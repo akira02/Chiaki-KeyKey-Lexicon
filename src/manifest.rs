@@ -1,12 +1,13 @@
 use crate::config::{
     Config, BONEYARD_SOURCE_ID, BONEYARD_SOURCE_NAME, BPMF_EXT_SOURCE_ID, BPMF_EXT_SOURCE_NAME,
-    CHIAKI_SYNTHETIC_SOURCE_ID, CHIAKI_SYNTHETIC_SOURCE_NAME, CHIAKI_WEB_OVERLAY_SOURCE_ID,
-    CHIAKI_WEB_OVERLAY_SOURCE_NAME, DATABASE_SCHEMA_VERSION, LIBCHEWING_SOURCE_ID,
-    LIBCHEWING_SOURCE_NAME, MODULE_CIN_SOURCE_ID, MODULE_CIN_SOURCE_NAME, MOZC_EMOTICON_SOURCE_ID,
-    MOZC_EMOTICON_SOURCE_NAME, OPENCC_VARIANT_SOURCE_ID, OPENCC_VARIANT_SOURCE_NAME,
-    OPENFORMOSA_COMMON_VOICE_SOURCE_ID, OPENFORMOSA_COMMON_VOICE_SOURCE_NAME, OVERLAY_SOURCE_ID,
-    OVERLAY_SOURCE_NAME, PREPOPULATED_SERVICE_SOURCE_ID, PREPOPULATED_SERVICE_SOURCE_NAME,
-    PUNCTUATION_SOURCE_ID, PUNCTUATION_SOURCE_NAME, RIME_ESSAY_SOURCE_ID, RIME_ESSAY_SOURCE_NAME,
+    CHIAKEY_AUTO_HOTWORDS_SOURCE_ID, CHIAKEY_AUTO_HOTWORDS_SOURCE_NAME, CHIAKI_SYNTHETIC_SOURCE_ID,
+    CHIAKI_SYNTHETIC_SOURCE_NAME, CHIAKI_WEB_OVERLAY_SOURCE_ID, CHIAKI_WEB_OVERLAY_SOURCE_NAME,
+    DATABASE_SCHEMA_VERSION, LIBCHEWING_SOURCE_ID, LIBCHEWING_SOURCE_NAME, MODULE_CIN_SOURCE_ID,
+    MODULE_CIN_SOURCE_NAME, MOZC_EMOTICON_SOURCE_ID, MOZC_EMOTICON_SOURCE_NAME,
+    OPENCC_VARIANT_SOURCE_ID, OPENCC_VARIANT_SOURCE_NAME, OPENFORMOSA_COMMON_VOICE_SOURCE_ID,
+    OPENFORMOSA_COMMON_VOICE_SOURCE_NAME, OVERLAY_SOURCE_ID, OVERLAY_SOURCE_NAME,
+    PREPOPULATED_SERVICE_SOURCE_ID, PREPOPULATED_SERVICE_SOURCE_NAME, PUNCTUATION_SOURCE_ID,
+    PUNCTUATION_SOURCE_NAME, RIME_ESSAY_SOURCE_ID, RIME_ESSAY_SOURCE_NAME,
     SYMBOL_OVERLAY_SOURCE_ID, SYMBOL_OVERLAY_SOURCE_NAME,
 };
 use crate::db;
@@ -129,6 +130,14 @@ pub fn release_metadata(
             "Chiaki.C",
             &paths.chiaki_synthetic_inventory,
             db::stats_for_source_rows(source_rows, "sources/chiaki-synthetic-overlay/"),
+        )?,
+        release_source(
+            CHIAKEY_AUTO_HOTWORDS_SOURCE_ID,
+            CHIAKEY_AUTO_HOTWORDS_SOURCE_NAME,
+            "CC0-1.0",
+            "ChiaKey Lexicon maintainers",
+            &paths.chiakey_auto_hotwords_inventory,
+            db::stats_for_source_rows(source_rows, "sources/chiakey-auto-hotwords-overlay/"),
         )?,
         release_source(
             OPENFORMOSA_COMMON_VOICE_SOURCE_ID,
@@ -299,6 +308,16 @@ pub fn manifest(
             "Chiaki.C",
             &paths.chiaki_synthetic_inventory,
             306,
+        )?,
+        manifest_source(
+            CHIAKEY_AUTO_HOTWORDS_SOURCE_ID,
+            CHIAKEY_AUTO_HOTWORDS_SOURCE_NAME,
+            "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiakey-auto-hotwords-overlay",
+            "tsv",
+            "CC0-1.0",
+            "ChiaKey Lexicon maintainers",
+            &paths.chiakey_auto_hotwords_inventory,
+            308,
         )?,
         manifest_source(
             OPENFORMOSA_COMMON_VOICE_SOURCE_ID,
