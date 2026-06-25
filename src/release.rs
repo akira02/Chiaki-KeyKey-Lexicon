@@ -1,3 +1,4 @@
+use crate::associated_phrases;
 use crate::bpmf_ext;
 use crate::config::{self, Config};
 use crate::db;
@@ -45,7 +46,21 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
+    import_libchewing_character_phrase_evidence(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
     import_bpmf_ext(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
+    import_rime_overlap_rerank(
         &mut conn,
         &cfg,
         &paths,
@@ -66,13 +81,6 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
-    import_opencc_variant_policy(
-        &mut conn,
-        &cfg,
-        &paths,
-        &mut source_keys,
-        &mut import_results,
-    )?;
     import_explicit_overlay(
         &mut conn,
         &cfg,
@@ -80,6 +88,30 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
+    import_chiaki_web_overlay(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
+    import_chiaki_synthetic_overlay(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
+    import_opencc_variant_policy(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
+    import_chiaki_synthetic_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
+    import_openformosa_common_voice_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
+    import_chiaki_web_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
     import_punctuations(
         &mut conn,
         &cfg,
@@ -96,11 +128,13 @@ pub fn run() -> Result<()> {
     )?;
     import_prepopulated_service_data(&mut conn, &cfg, &paths, &mut import_results)?;
     import_module_cin_tables(&mut conn, &cfg, &paths, &mut import_results)?;
+    import_associated_phrases(&mut conn, &mut import_results)?;
 
     db::refresh_metadata_counts(&conn)?;
     db::update_release_metadata_rows(&conn, &cfg)?;
     prepopulated::validate_runtime_required_data(&conn)?;
     module_cin::validate_runtime_required_data(&conn)?;
+    associated_phrases::validate_runtime_required_data(&conn)?;
     db::write_normalized(&conn, &cfg.normalized_path, &source_keys)?;
 
     let metadata = db::db_metadata(&conn)?;
@@ -149,9 +183,16 @@ fn verify_inputs(
         paths.punctuation_cin.clone(),
         paths.symbol_overlay_symbols.clone(),
         paths.canned_messages_plist.clone(),
+        paths.mozc_emoticon_categorized.clone(),
+        paths.mozc_emoticon_tsv.clone(),
         paths.bpmf_ext_cin.clone(),
         paths.overlay_phrases.clone(),
         paths.overlay_explicit.clone(),
+        paths.chiaki_web_overlay_explicit.clone(),
+        paths.chiaki_web_overlay_bigrams.clone(),
+        paths.chiaki_synthetic_unigrams.clone(),
+        paths.chiaki_synthetic_bigrams.clone(),
+        paths.openformosa_common_voice_bigrams.clone(),
         paths.opencc_variant_demotions.clone(),
         paths.rime_essay_raw.clone(),
     ];
@@ -169,11 +210,15 @@ fn create_output_dirs(cfg: &Config, paths: &ReleasePaths) -> Result<()> {
     fs::create_dir_all(&paths.punctuation_source_dir)?;
     fs::create_dir_all(&paths.symbol_overlay_source_dir)?;
     fs::create_dir_all(&paths.prepopulated_service_source_dir)?;
+    fs::create_dir_all(&paths.mozc_emoticon_source_dir)?;
     fs::create_dir_all(&paths.module_cin_source_dir)?;
     fs::create_dir_all(&paths.bpmf_ext_source_dir)?;
     fs::create_dir_all(&paths.libchewing_source_dir)?;
     fs::create_dir_all(&paths.rime_essay_source_dir)?;
     fs::create_dir_all(&paths.overlay_source_dir)?;
+    fs::create_dir_all(&paths.chiaki_web_overlay_source_dir)?;
+    fs::create_dir_all(&paths.chiaki_synthetic_source_dir)?;
+    fs::create_dir_all(&paths.openformosa_common_voice_source_dir)?;
     fs::create_dir_all(&paths.opencc_variant_source_dir)?;
     Ok(())
 }
@@ -213,6 +258,15 @@ fn write_source_inventories(
         true,
     )?;
     write_inventory(
+        &paths.mozc_emoticon_inventory,
+        &paths.mozc_emoticon_source_dir,
+        &[
+            paths.mozc_emoticon_categorized.clone(),
+            paths.mozc_emoticon_tsv.clone(),
+        ],
+        true,
+    )?;
+    write_inventory(
         &paths.module_cin_inventory,
         &paths.module_cin_source_dir,
         &module_cin_files(paths),
@@ -237,6 +291,30 @@ fn write_source_inventories(
             paths.overlay_phrases.clone(),
             paths.overlay_explicit.clone(),
         ],
+        true,
+    )?;
+    write_inventory(
+        &paths.chiaki_web_overlay_inventory,
+        &paths.chiaki_web_overlay_source_dir,
+        &[
+            paths.chiaki_web_overlay_explicit.clone(),
+            paths.chiaki_web_overlay_bigrams.clone(),
+        ],
+        true,
+    )?;
+    write_inventory(
+        &paths.chiaki_synthetic_inventory,
+        &paths.chiaki_synthetic_source_dir,
+        &[
+            paths.chiaki_synthetic_unigrams.clone(),
+            paths.chiaki_synthetic_bigrams.clone(),
+        ],
+        true,
+    )?;
+    write_inventory(
+        &paths.openformosa_common_voice_inventory,
+        &paths.openformosa_common_voice_source_dir,
+        std::slice::from_ref(&paths.openformosa_common_voice_bigrams),
         true,
     )?;
     write_inventory(
@@ -319,14 +397,46 @@ fn import_prepopulated_service_data(
     paths: &ReleasePaths,
     import_results: &mut Vec<ImportResult>,
 ) -> Result<()> {
-    let data = prepopulated::load(&paths.canned_messages_plist, &cfg.generated_at)?;
+    let data = prepopulated::load(
+        &paths.canned_messages_plist,
+        &paths.symbol_overlay_symbols,
+        &paths.mozc_emoticon_categorized,
+        &paths.mozc_emoticon_tsv,
+        &cfg.generated_at,
+    )?;
     prepopulated::validate_payload(&data)?;
 
-    let source_rows = vec![(
-        repo_relative(&cfg.root, &paths.canned_messages_plist)?,
-        prepopulated::source_kind().to_string(),
-        sha256_file(&paths.canned_messages_plist)?,
-    )];
+    let source_rows = vec![
+        (
+            repo_relative(&cfg.root, &paths.canned_messages_plist)?,
+            prepopulated::source_kind().to_string(),
+            sha256_file(&paths.canned_messages_plist)?,
+        ),
+        (
+            format!(
+                "{}#canned-messages",
+                repo_relative(&cfg.root, &paths.symbol_overlay_symbols)?
+            ),
+            "chiakey-symbols-overlay-canned-messages".to_string(),
+            sha256_file(&paths.symbol_overlay_symbols)?,
+        ),
+        (
+            format!(
+                "{}#canned-messages",
+                repo_relative(&cfg.root, &paths.mozc_emoticon_categorized)?
+            ),
+            "mozc-emoticon-categorized-canned-messages".to_string(),
+            sha256_file(&paths.mozc_emoticon_categorized)?,
+        ),
+        (
+            format!(
+                "{}#canned-messages",
+                repo_relative(&cfg.root, &paths.mozc_emoticon_tsv)?
+            ),
+            "mozc-emoticon-canned-messages".to_string(),
+            sha256_file(&paths.mozc_emoticon_tsv)?,
+        ),
+    ];
     db::apply_prepopulated_service_data(conn, &data, &source_rows)?;
 
     import_results.push(ImportResult {
@@ -335,7 +445,7 @@ fn import_prepopulated_service_data(
             repo_relative(&cfg.root, &paths.prepopulated_service_source_dir)?
         ),
         seen: 1,
-        added: 2,
+        added: 2 + data.supplemental_symbol_count + data.emoji_message_count,
         skipped: 0,
         records: Vec::new(),
     });
@@ -437,6 +547,25 @@ fn import_module_cin_tables(
     Ok(())
 }
 
+fn import_associated_phrases(
+    conn: &mut Connection,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let build = associated_phrases::build_from_unigrams(conn)?;
+    let result = db::apply_associated_phrase_records(
+        conn,
+        &build.records,
+        associated_phrases::SOURCE_PATH,
+        associated_phrases::SOURCE_KIND,
+        &build.sha256,
+        build.seen,
+        build.tail_count,
+        build.skipped,
+    )?;
+    import_results.push(result);
+    Ok(())
+}
+
 fn import_bpmf_ext(
     conn: &mut Connection,
     cfg: &Config,
@@ -470,17 +599,80 @@ fn import_rime(
 ) -> Result<()> {
     let char_readings = db::load_primary_character_readings(conn)?;
     let existing_phrases = db::load_existing_phrases(conn)?;
+    let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
     let (records, seen, skipped) = importers::parse_rime_essay(
         &paths.rime_essay_raw,
         cfg,
         &char_readings,
         &existing_phrases,
+        &existing_qstring_weights,
     )?;
     let result = db::apply_records(
         conn,
         records,
         &repo_relative(&cfg.root, &paths.rime_essay_raw)?,
         "rime-supplement",
+        &sha256_file(&paths.rime_essay_raw)?,
+        seen,
+        skipped,
+        false,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_libchewing_character_phrase_evidence(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let tsi_path = paths.libchewing_source_dir.join("raw/dict/chewing/tsi.csv");
+    let evidence = db::load_character_phrase_evidence(
+        conn,
+        importers::LIBCHEWING_CHARACTER_PHRASE_EVIDENCE_MIN_PHRASE_WEIGHT,
+    )?;
+    let seen = evidence.len();
+    let records = importers::phrase_evidence_character_records(&evidence);
+    let skipped = seen.saturating_sub(records.len());
+    let result = db::apply_records(
+        conn,
+        records,
+        &format!(
+            "{}#character-phrase-evidence",
+            repo_relative(&cfg.root, &tsi_path)?
+        ),
+        "libchewing-character-phrase-evidence",
+        &sha256_file(&tsi_path)?,
+        seen,
+        skipped,
+        false,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_rime_overlap_rerank(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let existing_records = db::load_existing_phrase_weights(conn)?;
+    let (records, seen, skipped) =
+        importers::parse_rime_overlap_reranks(&paths.rime_essay_raw, cfg, &existing_records)?;
+    let result = db::apply_records(
+        conn,
+        records,
+        &format!(
+            "{}#overlap-rerank",
+            repo_relative(&cfg.root, &paths.rime_essay_raw)?
+        ),
+        "rime-overlap-rerank",
         &sha256_file(&paths.rime_essay_raw)?,
         seen,
         skipped,
@@ -559,6 +751,117 @@ fn import_explicit_overlay(
         false,
     )?;
     remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_chiaki_web_overlay(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, skipped) =
+        importers::parse_chiaki_web_overlay(&paths.chiaki_web_overlay_explicit, cfg)?;
+    let result = db::apply_records(
+        conn,
+        records,
+        &repo_relative(&cfg.root, &paths.chiaki_web_overlay_explicit)?,
+        "chiaki-web-explicit-qstring",
+        &sha256_file(&paths.chiaki_web_overlay_explicit)?,
+        seen,
+        skipped,
+        false,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_chiaki_synthetic_overlay(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, skipped) =
+        importers::parse_chiaki_synthetic_overlay(&paths.chiaki_synthetic_unigrams, cfg)?;
+    let result = db::apply_records(
+        conn,
+        records,
+        &repo_relative(&cfg.root, &paths.chiaki_synthetic_unigrams)?,
+        "chiaki-synthetic-unigrams",
+        &sha256_file(&paths.chiaki_synthetic_unigrams)?,
+        seen,
+        skipped,
+        false,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_chiaki_web_bigrams(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, skipped) =
+        importers::parse_bigram_overlay(&paths.chiaki_web_overlay_bigrams, cfg)?;
+    let result = db::apply_bigram_records(
+        conn,
+        &records,
+        &repo_relative(&cfg.root, &paths.chiaki_web_overlay_bigrams)?,
+        "chiaki-web-bigram-overlay",
+        &sha256_file(&paths.chiaki_web_overlay_bigrams)?,
+        seen,
+        skipped,
+    )?;
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_chiaki_synthetic_bigrams(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, skipped) =
+        importers::parse_bigram_overlay(&paths.chiaki_synthetic_bigrams, cfg)?;
+    let result = db::apply_bigram_records(
+        conn,
+        &records,
+        &repo_relative(&cfg.root, &paths.chiaki_synthetic_bigrams)?,
+        "chiaki-synthetic-bigrams",
+        &sha256_file(&paths.chiaki_synthetic_bigrams)?,
+        seen,
+        skipped,
+    )?;
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_openformosa_common_voice_bigrams(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let (records, seen, skipped) =
+        importers::parse_bigram_overlay(&paths.openformosa_common_voice_bigrams, cfg)?;
+    let result = db::apply_bigram_records(
+        conn,
+        &records,
+        &repo_relative(&cfg.root, &paths.openformosa_common_voice_bigrams)?,
+        "openformosa-common-voice-bigrams",
+        &sha256_file(&paths.openformosa_common_voice_bigrams)?,
+        seen,
+        skipped,
+    )?;
     import_results.push(result);
     Ok(())
 }

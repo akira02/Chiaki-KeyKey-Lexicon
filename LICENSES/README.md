@@ -60,6 +60,21 @@ Unknown-license data must not be included in public release artifacts.
 - Review notes: [Docs/SourceReview.md](../Docs/SourceReview.md)
 - Release decision: included starting in `2026.06.9`
 
+### Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay
+
+- Source id: `chiaki-synthetic-overlay`
+- License file: [chiaki-synthetic-overlay-NC.txt](chiaki-synthetic-overlay-NC.txt)
+- Review notes: [Docs/SourceReview.md](../Docs/SourceReview.md)
+- Release decision: included for public source review, open-source project use, and non-commercial release builds
+- Note: licensed under CC BY-NC 4.0; non-commercial and open-source projects may use this source, but commercial use requires permission from Chiaki.C
+
+### OpenFormosa Common Voice 25 zh-TW bigram overlay
+
+- Source id: `openformosa-common-voice-25-zh-tw`
+- License file: [CC0-1.0.txt](CC0-1.0.txt)
+- Review notes: [Docs/SourceReview.md](../Docs/SourceReview.md)
+- Release decision: included as selected runtime bigram rows
+
 ### OpenCC-derived Traditional Chinese variant policy
 
 - Source id: `opencc-variant-policy`

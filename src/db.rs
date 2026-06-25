@@ -2,7 +2,9 @@ use crate::config::{Config, BONEYARD_SOURCE_ID};
 use crate::files::count_lines;
 use crate::importers::{dedupe_records, format_weight};
 use crate::prepopulated::ServiceData;
-use crate::types::{ImportResult, KeyValueRecord, SourceRecord, VariantDemotionRecord};
+use crate::types::{
+    BigramRecord, ImportResult, KeyValueRecord, SourceRecord, VariantDemotionRecord,
+};
 use anyhow::Result;
 use rusqlite::types::ValueRef;
 use rusqlite::{params, Connection};
@@ -103,7 +105,14 @@ pub fn apply_records(
 
 pub fn refresh_metadata_counts(conn: &Connection) -> Result<()> {
     conn.execute(
-        "DELETE FROM chiaki_db_metadata WHERE key IN ('unigram_count', 'candidate_count')",
+        "DELETE FROM chiaki_db_metadata
+         WHERE key IN (
+             'unigram_count',
+             'candidate_count',
+             'associated_phrase_head_count',
+             'associated_phrase_tail_count',
+             'bopomofo_correction_count'
+         )",
         [],
     )?;
     conn.execute(
@@ -112,6 +121,31 @@ pub fn refresh_metadata_counts(conn: &Connection) -> Result<()> {
     )?;
     conn.execute(
         "INSERT INTO chiaki_db_metadata VALUES('candidate_count', (SELECT COUNT(*) FROM 'Mandarin-bpmf-cin' WHERE key NOT LIKE '__property_%'))",
+        [],
+    )?;
+    conn.execute(
+        "INSERT INTO chiaki_db_metadata
+         VALUES('associated_phrase_head_count', (SELECT COUNT(*) FROM associated_phrases))",
+        [],
+    )?;
+    conn.execute(
+        "INSERT INTO chiaki_db_metadata
+         VALUES(
+             'associated_phrase_tail_count',
+             (
+                 SELECT COALESCE(SUM(1 + LENGTH(data) - LENGTH(REPLACE(data, ',', ''))), 0)
+                 FROM associated_phrases
+                 WHERE data <> ''
+             )
+         )",
+        [],
+    )?;
+    conn.execute(
+        "INSERT INTO chiaki_db_metadata
+         VALUES(
+             'bopomofo_correction_count',
+             (SELECT COUNT(*) FROM 'BopomofoCorrection-bopomofo-correction-cin')
+         )",
         [],
     )?;
     Ok(())
@@ -125,6 +159,11 @@ pub fn apply_prepopulated_service_data(
     let tx = conn.transaction()?;
     tx.execute(
         "CREATE TABLE IF NOT EXISTS prepopulated_service_data (key, value)",
+        [],
+    )?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS prepopulated_service_data_index
+         ON prepopulated_service_data (key)",
         [],
     )?;
 
@@ -195,6 +234,122 @@ pub fn apply_key_value_records(
             ),
             [],
         )?;
+    }
+
+    tx.execute(
+        "DELETE FROM chiaki_db_sources WHERE source = ?1",
+        params![source_path],
+    )?;
+    tx.execute(
+        "INSERT INTO chiaki_db_sources VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
+        params![
+            source_path,
+            kind,
+            source_sha256,
+            seen as i64,
+            records.len() as i64,
+            skipped as i64
+        ],
+    )?;
+
+    tx.commit()?;
+    Ok(ImportResult {
+        source_path: source_path.to_string(),
+        seen,
+        added: records.len(),
+        skipped,
+        records: Vec::new(),
+    })
+}
+
+pub fn apply_associated_phrase_records(
+    conn: &mut Connection,
+    records: &[KeyValueRecord],
+    source_path: &str,
+    kind: &str,
+    source_sha256: &str,
+    seen: usize,
+    added: usize,
+    skipped: usize,
+) -> Result<ImportResult> {
+    let tx = conn.transaction()?;
+
+    tx.execute("DROP INDEX IF EXISTS associated_phrases_index", [])?;
+    tx.execute("DROP TABLE IF EXISTS associated_phrases", [])?;
+    tx.execute("CREATE TABLE associated_phrases (headchar, data)", [])?;
+
+    {
+        let mut insert = tx.prepare("INSERT INTO associated_phrases VALUES(?1, ?2)")?;
+        for record in records {
+            insert.execute(params![record.key, record.value])?;
+        }
+    }
+
+    tx.execute(
+        "CREATE INDEX associated_phrases_index ON associated_phrases (headchar)",
+        [],
+    )?;
+    tx.execute(
+        "DELETE FROM chiaki_db_sources WHERE source = ?1",
+        params![source_path],
+    )?;
+    tx.execute(
+        "INSERT INTO chiaki_db_sources VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
+        params![
+            source_path,
+            kind,
+            source_sha256,
+            seen as i64,
+            added as i64,
+            skipped as i64
+        ],
+    )?;
+
+    tx.commit()?;
+    Ok(ImportResult {
+        source_path: source_path.to_string(),
+        seen,
+        added,
+        skipped,
+        records: Vec::new(),
+    })
+}
+
+pub fn apply_bigram_records(
+    conn: &mut Connection,
+    records: &[BigramRecord],
+    source_path: &str,
+    kind: &str,
+    source_sha256: &str,
+    seen: usize,
+    skipped: usize,
+) -> Result<ImportResult> {
+    let tx = conn.transaction()?;
+
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS bigrams (qstring, previous, current, probability)",
+        [],
+    )?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS bigrams_index ON bigrams (qstring)",
+        [],
+    )?;
+
+    {
+        let mut delete = tx.prepare(
+            "DELETE FROM bigrams
+             WHERE qstring = ?1 AND previous = ?2 AND current = ?3",
+        )?;
+        let mut insert = tx.prepare("INSERT INTO bigrams VALUES(?1, ?2, ?3, ?4)")?;
+        for record in records {
+            delete.execute(params![record.qstring, record.previous, record.current])?;
+            insert.execute(params![
+                record.qstring,
+                record.previous,
+                record.current,
+                record.probability
+            ])?;
+        }
     }
 
     tx.execute(
@@ -426,9 +581,26 @@ pub fn db_counts(
         conn.query_row("SELECT COUNT(*) FROM 'Mandarin-bpmf-cin'", [], |row| {
             row.get(0)
         })?;
+    let associated_phrase_rows: i64 =
+        conn.query_row("SELECT COUNT(*) FROM associated_phrases", [], |row| {
+            row.get(0)
+        })?;
+    let bopomofo_correction_rows: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM 'BopomofoCorrection-bopomofo-correction-cin'",
+        [],
+        |row| row.get(0),
+    )?;
     let normalized_rows = count_lines(normalized_path)? as i64;
     let candidate_rows = metadata
         .get("candidate_count")
+        .and_then(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_str()?.parse::<i64>().ok())
+        })
+        .unwrap_or_default();
+    let associated_phrase_tails = metadata
+        .get("associated_phrase_tail_count")
         .and_then(|value| {
             value
                 .as_i64()
@@ -440,6 +612,9 @@ pub fn db_counts(
         "bigrams": bigrams,
         "candidate_rows": candidate_rows,
         "mandarin_bpmf_cin_rows": mandarin_rows,
+        "bopomofo_correction_rows": bopomofo_correction_rows,
+        "associated_phrase_rows": associated_phrase_rows,
+        "associated_phrase_tails": associated_phrase_tails,
         "normalized_rows": normalized_rows
     }))
 }
@@ -465,6 +640,70 @@ pub fn load_existing_phrases(conn: &Connection) -> Result<HashSet<String>> {
     let mut stmt = conn.prepare("SELECT DISTINCT current FROM unigrams WHERE current <> ''")?;
     let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
     rows.collect::<std::result::Result<HashSet<_>, _>>()
+        .map_err(Into::into)
+}
+
+pub fn load_existing_phrase_weights(conn: &Connection) -> Result<Vec<(String, String, f64)>> {
+    let mut stmt = conn.prepare(
+        "SELECT qstring, current, probability
+         FROM unigrams
+         WHERE current <> ''",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, f64>(2)?,
+        ))
+    })?;
+    rows.collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(Into::into)
+}
+
+pub fn load_best_qstring_weights(conn: &Connection) -> Result<HashMap<String, f64>> {
+    let mut stmt = conn.prepare(
+        "SELECT qstring, MAX(probability)
+         FROM unigrams
+         WHERE current <> ''
+         GROUP BY qstring",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+    })?;
+    rows.collect::<std::result::Result<HashMap<_, _>, _>>()
+        .map_err(Into::into)
+}
+
+pub fn load_character_phrase_evidence(
+    conn: &Connection,
+    min_phrase_weight: f64,
+) -> Result<Vec<(String, String, f64, f64, usize)>> {
+    let mut stmt = conn.prepare(
+        "SELECT c.qstring,
+                c.current,
+                c.probability,
+                MAX(p.probability),
+                COUNT(*)
+         FROM unigrams c
+         JOIN unigrams p
+           ON length(c.current) = 1
+          AND length(p.current) > 1
+          AND length(p.qstring) = length(p.current) * 2
+          AND substr(p.current, 1, 1) = c.current
+          AND substr(p.qstring, 1, 2) = c.qstring
+         WHERE p.probability >= ?1
+         GROUP BY c.qstring, c.current, c.probability",
+    )?;
+    let rows = stmt.query_map(params![min_phrase_weight], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, f64>(2)?,
+            row.get::<_, f64>(3)?,
+            row.get::<_, i64>(4)? as usize,
+        ))
+    })?;
+    rows.collect::<std::result::Result<Vec<_>, _>>()
         .map_err(Into::into)
 }
 

@@ -19,6 +19,10 @@ pub const PREPOPULATED_SERVICE_SOURCE_ID: &str = "keykey-prepopulated-service-da
 pub const PREPOPULATED_SERVICE_SOURCE_NAME: &str = "KeyKey prepopulated service data";
 pub const CANNED_MESSAGES_VENDOR_PATH: &str =
     "sources/keykey-prepopulated-service-data/vendor/CannedMessages.plist";
+pub const MOZC_EMOTICON_SOURCE_ID: &str = "mozc-emoticon-data";
+pub const MOZC_EMOTICON_SOURCE_NAME: &str = "Mozc emoticon data";
+pub const MOZC_EMOTICON_CATEGORIZED_PATH: &str = "sources/mozc-emoticon-data/raw/categorized.tsv";
+pub const MOZC_EMOTICON_TSV_PATH: &str = "sources/mozc-emoticon-data/raw/emoticon.tsv";
 pub const MODULE_CIN_SOURCE_ID: &str = "keykey-module-cin";
 pub const MODULE_CIN_SOURCE_NAME: &str = "KeyKey module CIN tables";
 pub const CJ_EXT_VENDOR_PATH: &str = "sources/keykey-module-cin/vendor/cj-ext.cin";
@@ -38,6 +42,14 @@ pub const RIME_ESSAY_SOURCE_ID: &str = "rime-essay";
 pub const RIME_ESSAY_SOURCE_NAME: &str = "Rime essay shared vocabulary and language model";
 pub const OVERLAY_SOURCE_ID: &str = "chiakey-modern-overlay";
 pub const OVERLAY_SOURCE_NAME: &str = "ChiaKey modern overlay phrases";
+pub const CHIAKI_WEB_OVERLAY_SOURCE_ID: &str = "chiaki-web-overlay";
+pub const CHIAKI_WEB_OVERLAY_SOURCE_NAME: &str = "Chiaki reviewed web corpus overlay";
+pub const CHIAKI_SYNTHETIC_SOURCE_ID: &str = "chiaki-synthetic-overlay";
+pub const CHIAKI_SYNTHETIC_SOURCE_NAME: &str =
+    "Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay";
+pub const OPENFORMOSA_COMMON_VOICE_SOURCE_ID: &str = "openformosa-common-voice-25-zh-tw";
+pub const OPENFORMOSA_COMMON_VOICE_SOURCE_NAME: &str =
+    "OpenFormosa Common Voice 25 zh-TW bigram overlay";
 pub const OPENCC_VARIANT_SOURCE_ID: &str = "opencc-variant-policy";
 pub const OPENCC_VARIANT_SOURCE_NAME: &str = "OpenCC-derived Traditional Chinese variant policy";
 pub const DATABASE_SCHEMA_VERSION: i64 = 1;
@@ -73,6 +85,21 @@ pub const DOWNLOADS: &[SourceDownload] = &[
         path: "LICENSES/rime-essay-LGPL-3.0.txt",
         sha256: "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
     },
+    SourceDownload {
+        url: "https://raw.githubusercontent.com/google/mozc/28da5a39f9a7fd70251c85d269f4a8b47aa31cf8/src/data/emoticon/categorized.tsv",
+        path: MOZC_EMOTICON_CATEGORIZED_PATH,
+        sha256: "4497c16a706de418b05e73eaddbce13e5d3390e7c2de71200b28c0c97ae5c4fc",
+    },
+    SourceDownload {
+        url: "https://raw.githubusercontent.com/google/mozc/28da5a39f9a7fd70251c85d269f4a8b47aa31cf8/src/data/emoticon/emoticon.tsv",
+        path: MOZC_EMOTICON_TSV_PATH,
+        sha256: "366558b380bef07dda26822c9100d1efabee539f7961b2c6363d4614c4a762c4",
+    },
+    SourceDownload {
+        url: "https://raw.githubusercontent.com/google/mozc/28da5a39f9a7fd70251c85d269f4a8b47aa31cf8/LICENSE",
+        path: "LICENSES/mozc-BSD-3-Clause.txt",
+        sha256: "44cdd923b91ea9199293abecc2762c70c87dbf1e581c027a94c416368d1a648c",
+    },
 ];
 
 pub struct Config {
@@ -92,7 +119,7 @@ pub struct Config {
 
 pub fn load() -> Result<Config> {
     let root = env::current_dir().context("read current directory")?;
-    let release_version = env_or("LEXICON_VERSION", "2026.06.7");
+    let release_version = env_or("LEXICON_VERSION", "2026.06.9");
     let language_model_version = format!("chiakey-modern-{release_version}");
     let minimum_app_version = env_or("MINIMUM_APP_VERSION", "0.1.0");
     let generated_at = env::var("GENERATED_AT")

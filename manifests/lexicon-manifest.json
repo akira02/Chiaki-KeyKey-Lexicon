@@ -2,37 +2,37 @@
   "artifacts": [
     {
       "database_schema_version": 1,
-      "filename": "KeyKeySource-2026.06.7.db",
+      "filename": "KeyKeySource-2026.06.9.db",
       "id": "smart-mandarin-db",
       "kind": "keykey-source-db",
-      "language_model_version": "chiakey-modern-2026.06.7",
-      "sha256": "46881e7bae5ba7d039dfaf4e7519e31c8da51dee384fdea28a2b1c9eeeef6724",
-      "size": 51281920,
-      "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.7/KeyKeySource-2026.06.7.db"
+      "language_model_version": "chiakey-modern-2026.06.9",
+      "sha256": "1f41a52b05a0017d777f6242df776f76a6f063ff676f64c2cc3d71ad2274d286",
+      "size": 58392576,
+      "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/KeyKeySource-2026.06.9.db"
     },
     {
       "database_schema_version": 1,
-      "filename": "KeyKeySource-2026.06.7.json",
+      "filename": "KeyKeySource-2026.06.9.json",
       "id": "smart-mandarin-metadata",
       "kind": "metadata",
-      "language_model_version": "chiakey-modern-2026.06.7",
-      "sha256": "3256446c71e81445e86f64f9833b71b24f08b18c89379e40b9ef2095ce8d1a21",
-      "size": 20661,
-      "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.7/KeyKeySource-2026.06.7.json"
+      "language_model_version": "chiakey-modern-2026.06.9",
+      "sha256": "e66eb0362f1906760c5292c3e91b261f383a6924c7dab496b85604bf1748d847",
+      "size": 25750,
+      "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/KeyKeySource-2026.06.9.json"
     },
     {
       "database_schema_version": 1,
       "filename": "SHA256SUMS",
       "id": "smart-mandarin-checksums",
       "kind": "checksum",
-      "language_model_version": "chiakey-modern-2026.06.7",
-      "sha256": "5ca482ff159849071a8a8546fee265c11550d31eff8344c288d09f4598d1f20a",
+      "language_model_version": "chiakey-modern-2026.06.9",
+      "sha256": "1e26f016a481e27be6d1d15e992894553723994aa2e3db9a938653db7f8bada2",
       "size": 186,
-      "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.7/SHA256SUMS"
+      "url": "https://github.com/akira02/ChiaKey-Lexicon/releases/download/2026.06.9/SHA256SUMS"
     }
   ],
   "database_schema_version": 1,
-  "generated_at": "2026-06-23T04:27:46Z",
+  "generated_at": "2026-06-25T07:04:24Z",
   "minimum_app_version": "0.1.0",
   "schema": 1,
   "sources": [
@@ -79,6 +79,17 @@
       "priority": 130,
       "sha256": "a53fa4866b02a87d1558c089c644314a2e234482913e11a00126e7ea12fcbca2",
       "url": "https://github.com/vChewing/KeyKey-Boneyard/tree/master/YahooKeyKey-Source-1.1.2528/Distributions/Takao/OnlineData"
+    },
+    {
+      "attribution": "Google and Mozc contributors",
+      "enabled": true,
+      "format": "tsv",
+      "id": "mozc-emoticon-data",
+      "license": "BSD-3-Clause",
+      "name": "Mozc emoticon data",
+      "priority": 135,
+      "sha256": "65af507600a59f3833e5830f91dff4df26a596db2366395ead4e64b05c76ec62",
+      "url": "https://github.com/google/mozc/tree/28da5a39f9a7fd70251c85d269f4a8b47aa31cf8/src/data/emoticon"
     },
     {
       "attribution": "Yahoo! Inc.; OpenVanilla contributors; opendesktop.org.tw CIN contributors; KeyKey Boneyard / ChiaKey maintainers",
@@ -136,6 +147,39 @@
       "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiakey-modern-overlay"
     },
     {
+      "attribution": "ChiaKey Lexicon maintainers",
+      "enabled": true,
+      "format": "tsv",
+      "id": "chiaki-web-overlay",
+      "license": "CC0-1.0",
+      "name": "Chiaki reviewed web corpus overlay",
+      "priority": 305,
+      "sha256": "6406c0d39bdd9e5d06859d97fdd6100b23c1723840c9582e5c021bae980d1132",
+      "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiaki-web-overlay"
+    },
+    {
+      "attribution": "Chiaki.C",
+      "enabled": true,
+      "format": "tsv",
+      "id": "chiaki-synthetic-overlay",
+      "license": "CC BY-NC 4.0; commercial use requires permission from Chiaki.C",
+      "name": "Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay",
+      "priority": 306,
+      "sha256": "243b04e47e332aa97cfb224fdd19e99fec872a6d17fec2b0cec7aba390537f49",
+      "url": "https://github.com/akira02/ChiaKey-Lexicon/tree/main/sources/chiaki-synthetic-overlay"
+    },
+    {
+      "attribution": "OpenFormosa / Mozilla Common Voice contributors",
+      "enabled": true,
+      "format": "tsv",
+      "id": "openformosa-common-voice-25-zh-tw",
+      "license": "CC0-1.0",
+      "name": "OpenFormosa Common Voice 25 zh-TW bigram overlay",
+      "priority": 307,
+      "sha256": "49f8d03e248b3a97a965d226d34ced37eaf4a87483b0995777af3b2c1cfbd6e0",
+      "url": "https://huggingface.co/datasets/OpenFormosa/common_voice_25_zh-TW"
+    },
+    {
       "attribution": "OpenCC contributors; ChiaKey Lexicon maintainers",
       "enabled": true,
       "format": "tsv",
@@ -147,5 +191,5 @@
       "url": "https://github.com/BYVoid/OpenCC"
     }
   ],
-  "version": "2026.06.7"
+  "version": "2026.06.9"
 }

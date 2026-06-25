@@ -1,64 +1,179 @@
-# Source Review
+# 來源審查
 
-Last reviewed: 2026-06-23
+最後審查日期：2026-06-23
 
-## Included in v1
+## v1 已納入
 
 ### keykey-boneyard-bootstrap
 
-- Name: KeyKey Boneyard bootstrap data
-- Local release input: `sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db`
-- Upstream archive: <https://github.com/vChewing/KeyKey-Boneyard>
-- Current fork note: <https://github.com/akira02/ChiaKey>
-- License: BSD-3-Clause-style Yahoo! KeyKey upstream license
-- Attribution: Yahoo! Inc., OpenVanilla contributors, KeyKey Boneyard / ChiaKey maintainers
-- Redistribution decision: included for the first public seed release
+- 名稱：KeyKey Boneyard bootstrap data
+- 本地 release input：`sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db`
+- 上游封存：<https://github.com/vChewing/KeyKey-Boneyard>
+- 目前 fork 註記：<https://github.com/akira02/ChiaKey>
+- 授權：BSD-3-Clause 風格的 Yahoo! KeyKey 上游授權
+- 署名：Yahoo! Inc., OpenVanilla contributors, KeyKey Boneyard / ChiaKey maintainers
+- 再散布決策：納入第一版公開 seed release
 
-This repository vendors only the cooked bootstrap database needed by the release builder:
+這個 repository 只 vendor release builder 需要的 cooked bootstrap database：
 
 ```text
 sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db
 sources/keykey-boneyard-bootstrap/vendor/KeyKeySource.db.sha256
 ```
 
-The source files used to produce that bootstrap database are limited to the redistributable KeyKey Boneyard inputs:
+產生該 bootstrap database 的 source files 限於可再散布的 KeyKey Boneyard inputs：
 
 - `YahooKeyKey-Source-1.1.2528/DataTables/bpmf.cin`
 - `YahooKeyKey-Source-1.1.2528/Distributions/Takao/DataSource/Addendum/*.txt`
 - `YahooKeyKey-Source-1.1.2528/Distributions/Takao/DataSource/Overrides/*.txt`
 - `YahooKeyKey-Source-1.1.2528/Distributions/Takao/DataSource/Modern/*.txt`
 
-The generated source inventory is stored at:
+產生的 source inventory 存放於：
 
 ```text
 sources/keykey-boneyard-bootstrap/source-inventory.sha256
 ```
 
-The manifest records the SHA-256 of that inventory file, not a single raw upstream archive.
+manifest 記錄的是該 inventory file 的 SHA-256，而不是單一 upstream archive 的 SHA-256。
 
-`source-inventory.sha256` is kept as provenance for the vendored cooked database. The full KeyKey Boneyard tree is not copied into this repository.
+`source-inventory.sha256` 保留作為 vendored cooked database 的 provenance。完整 KeyKey Boneyard tree 不會複製到這個 repository。
 
-## Included Starting in 2026.06.6
+## 自 2026.06.2 起納入
+
+### chiakey-modern-overlay
+
+- 名稱：ChiaKey modern overlay phrases
+- 本地來源：
+  - `sources/chiakey-modern-overlay/phrases.tsv`
+  - `sources/chiakey-modern-overlay/explicit.tsv`
+- 授權：CC0-1.0
+- 署名：ChiaKey Lexicon maintainers
+- 再散布決策：納入公開 release
+
+這個來源刻意保持小型且由專案自有維護。它用於實測時發現的明顯 seed lexicon 缺漏，例如不應等未來大型 frequency corpus 才補上的基本輸入法用語。
+
+`phrases.tsv` 讓 release builder 從單字資料推導 readings。`explicit.tsv` 則用於依賴特定 KeyKey qstring 的修正，例如為 neutral-tone `ㄍㄜ˙` / `ek7` 提升 `個`。
+
+## 自 2026.06.3 起納入
+
+### libchewing-data
+
+- 名稱：libchewing-data Traditional Chinese Zhuyin dictionary
+- 本地來源：`sources/libchewing-data/raw/`
+- 上游 release：<https://github.com/chewing/libchewing-data/releases/tag/v2026.3.22>
+- 目前上游 home：<https://codeberg.org/chewing/libchewing-data>
+- 授權：LGPL-2.1-or-later
+- 署名：libchewing Core Team
+- 再散布決策：自 `2026.06.3` 起納入公開 release
+
+release builder 匯入這些 pinned files：
+
+- `dict/chewing/tsi.csv`
+- `dict/chewing/alt.csv`
+- `dict/chewing/word.csv`
+
+`tsi.csv` 與 `alt.csv` 會作為主要現代詞彙層匯入，因為它們包含明確注音讀音。對 libchewing-data 中存在的詞，builder 會用 libchewing 的明確讀音取代 bootstrap database 中較舊的推導讀音。`word.csv` 只用來補缺少的單字讀音。
+
+自 `2026.06.5` 起，`tsi.csv` 中的單字 rows 也會匯入作為 character-frequency correction layer。這讓 `我` 等常用字保留 libchewing 頻率，而不是與 bootstrap database 中同讀音的罕用字 tie。
+character-frequency mapping 會保留一個小型 single-character segmentation penalty，避免常用字意外超過同讀音的明確詞彙 rows。
+較低排序的 libchewing 多字 rows 也會取得 bounded segment bonus，讓 `地基`、`權重` 這類已知詞能高於同讀音的逐字切分，同時不把原本已強的詞推過 phrase scale 的上緣。
+當多個高頻 libchewing phrase 都以同一個字與同一讀音開頭時，weak single-character readings 也可被提升。這能讓 `數` / `ㄕㄨˋ` 這類讀音依據 `數位`、`數學`、`數量`、`數字` 等詞的證據出現在候選列表，同時仍保持在最強 phrase evidence 之下。
+
+最終 release database 也會從組裝完成的 `unigrams` table 派生 `associated_phrases`，供 runtime associated-phrase module 使用。每列會把已 commit 的 head character 映射到 comma-separated phrase tails，所以 commit `我` 後可以提示 `們`、`的` 等 tails。這張表會在所有 lexical imports 與 policy layers 套用後產生，release 完成前也會驗證代表性 rows。
+
+raw files vendored 於 `sources/libchewing-data/raw/`，所以 release builds 不需要 network access。maintainers 可用以下指令刷新 pinned snapshots：
+
+```text
+cargo run --release -- fetch-modern-sources
+```
+
+產生的 source inventory 存放於：
+
+```text
+sources/libchewing-data/source-inventory.sha256
+```
+
+### rime-essay
+
+- 名稱：Rime essay shared vocabulary and language model
+- 本地來源：`sources/rime-essay/raw/essay.txt`
+- 上游 commit：<https://github.com/rime/rime-essay/tree/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed>
+- 授權：LGPL-3.0
+- 署名：Rime essay contributors
+- 再散布決策：自 `2026.06.3` 起納入公開 release
+
+Rime essay 有可用的現代詞彙與分數，但不包含注音讀音。因此 release builder 只會在另一個來源已提供讀音後使用它。
+
+首先，overlap rerank pass 會用 Rime scores 提升同一 KeyKey qstring group 內的既有候選。這個 pass 只會把較低排序的候選提升到足以尊重 Rime ordering，不會 demote 既有 rows，也會限制 promotion，避免 Rime 把 ambiguous candidate 推過既有高頻詞範圍。
+
+接著，低優先補充詞 pass 會匯入符合以下條件的 entries：
+
+1. 該詞在 libchewing-data 匯入後尚不存在。
+2. 詞長介於 2 到 7 個 Unicode codepoints。
+3. Rime score 至少為 `40`。
+4. 每個字在目前 database 中都有 primary single-character reading。
+
+在這個補充 pass 中，原本會低於既有 split path 的 entries 會被提升到剛好超過該 split，並以 Rime supplemental range 的上緣為 cap。這讓 `趁現在` 這類完整詞能比 `稱` + `現在` 這種不太可能的字詞切分取得小幅 segmentation advantage，而不需要 per-phrase explicit overrides。
+
+這能避免用推導讀音取代 libchewing 的明確注音資料，同時在讀音能安全推導到足以作為補充層時，加入社群、新聞、科技等現代詞彙。
+
+產生的 source inventory 存放於：
+
+```text
+sources/rime-essay/source-inventory.sha256
+```
+
+## 自 2026.06.5 起納入
+
+### bpmf-ext-cin
+
+- 名稱：Public domain extended BPMF character table
+- 本地來源：`sources/bpmf-ext-cin/vendor/bpmf-ext.cin`
+- 上游來源檔：<https://github.com/vChewing/KeyKey-Boneyard/blob/master/YahooKeyKey-Source-1.1.2528/DataTables/bpmf-ext.cin>
+- 授權：Public Domain，依來源檔 header
+- 署名：opendesktop.org.tw phone.cin contributors; KeyKey Boneyard maintainers
+- 再散布決策：自 `2026.06.5` 起納入公開 release
+
+這個來源會在 libchewing-data 之後、Rime essay 之前匯入。release builder 只把它當作低優先的單字讀音補充：
+
+1. 只匯入 CJK BMP 字元。
+2. 排除 non-BMP 與 private-use 字元。
+3. 只加入缺少的 exact `(reading, character)` pairs。
+4. 不覆蓋 libchewing character frequencies。
+
+這會補齊 native/Yahoo character coverage gaps，例如 `ㄨㄛˇ` 候選集合：
+
+```text
+我 婐 捰 倭 䂺 婑 䰀 㦱
+```
+
+產生的 source inventory 存放於：
+
+```text
+sources/bpmf-ext-cin/source-inventory.sha256
+```
+
+## 自 2026.06.6 起納入
 
 ### keykey-punctuations-cin
 
-- Name: KeyKey BPMF punctuation table
-- Local source: `sources/keykey-punctuations-cin/vendor/bpmf-punctuations.cin`
-- Upstream source file: <https://github.com/vChewing/KeyKey-Boneyard/blob/master/YahooKeyKey-Source-1.1.2528/DataTables/bpmf-punctuations.cin>
-- License: BSD-3-Clause-style Yahoo! KeyKey upstream license
-- Attribution: Yahoo! Inc., OpenVanilla contributors, KeyKey Boneyard / ChiaKey maintainers
-- Redistribution decision: included for public releases starting in `2026.06.6`
+- 名稱：KeyKey BPMF punctuation table
+- 本地來源：`sources/keykey-punctuations-cin/vendor/bpmf-punctuations.cin`
+- 上游來源檔：<https://github.com/vChewing/KeyKey-Boneyard/blob/master/YahooKeyKey-Source-1.1.2528/DataTables/bpmf-punctuations.cin>
+- 授權：BSD-3-Clause 風格的 Yahoo! KeyKey 上游授權
+- 署名：Yahoo! Inc., OpenVanilla contributors, KeyKey Boneyard / ChiaKey maintainers
+- 再散布決策：自 `2026.06.6` 起納入公開 release
 
-This source restores the original KeyKey runtime punctuation lookup rows. The release builder imports only rows inside `%chardef` whose keys start with `_punctuation_` or `_ctrl_`, and writes them to both `unigrams` and `Mandarin-bpmf-cin`.
+這個來源恢復原始 KeyKey runtime punctuation lookup rows。release builder 只匯入 `%chardef` 中 key 以 `_punctuation_` 或 `_ctrl_` 開頭的 rows，並同時寫入 `unigrams` 與 `Mandarin-bpmf-cin`。
 
-These rows are required for Smart Mandarin punctuation handling, for example:
+Smart Mandarin 的標點處理需要這些 rows，例如：
 
 ```text
 _punctuation_<          ，
 _punctuation_Standard_< ，
 ```
 
-The generated source inventory is stored at:
+產生的 source inventory 存放於：
 
 ```text
 sources/keykey-punctuations-cin/source-inventory.sha256
@@ -66,18 +181,20 @@ sources/keykey-punctuations-cin/source-inventory.sha256
 
 ### keykey-prepopulated-service-data
 
-- Name: KeyKey prepopulated service data
-- Local source: `sources/keykey-prepopulated-service-data/vendor/`
-- Upstream source directory: <https://github.com/vChewing/KeyKey-Boneyard/tree/master/YahooKeyKey-Source-1.1.2528/Distributions/Takao/OnlineData>
-- License: BSD-3-Clause-style Yahoo! KeyKey upstream license
-- Attribution: Yahoo! Inc., OpenVanilla contributors, KeyKey Boneyard / ChiaKey maintainers
-- Redistribution decision: included for public releases starting in `2026.06.6`
+- 名稱：KeyKey prepopulated service data
+- 本地來源：`sources/keykey-prepopulated-service-data/vendor/`
+- 上游來源目錄：<https://github.com/vChewing/KeyKey-Boneyard/tree/master/YahooKeyKey-Source-1.1.2528/Distributions/Takao/OnlineData>
+- 授權：BSD-3-Clause 風格的 Yahoo! KeyKey 上游授權
+- 署名：Yahoo! Inc., OpenVanilla contributors, KeyKey Boneyard / ChiaKey maintainers
+- 再散布決策：自 `2026.06.6` 起納入公開 release
 
-This source restores the original KeyKey prepopulated canned-message payload. The release builder writes the complete `CannedMessages.plist` contents to `prepopulated_service_data` as `canned_messages`, then writes a positive release timestamp as `canned_messages_timestamp`.
+這個來源恢復原始 KeyKey 預載 canned-message payload。release builder 會把完整 `CannedMessages.plist` 內容寫入 `prepopulated_service_data` 的 `canned_messages`，並以正值 release timestamp 寫入 `canned_messages_timestamp`。
 
-`OneKey.plist` is intentionally omitted from public releases. OneKey was a Yahoo-era URL launcher rather than input lexicon data, and modern ChiaKey no longer loads it. New release databases must not contain `onekey_services` or `onekey_services_timestamp`.
+release cooking 時，builder 會用 `chiakey-symbols-overlay/symbols.tsv` 產生一組 button categories 來補強 canned-message payload。這讓可見的符號表取得與 `_punctuation_list` 相同的補充符號，但不會把所有符號塞進單一過大的分類。builder 也會用 Mozc-backed `Messages` list 取代原始帶註解的 `顏文字` 分類，讓符號表只顯示顏文字本體，而不是 `顏文字 + 中文說明` 這類字串。
 
-The generated source inventory is stored at:
+`OneKey.plist` 會刻意從公開 release 省略。OneKey 是 Yahoo 時代的 URL launcher，不是輸入詞庫資料；現代 ChiaKey 也不再載入它。新的 release databases 不應包含 `onekey_services` 或 `onekey_services_timestamp`。
+
+產生的 source inventory 存放於：
 
 ```text
 sources/keykey-prepopulated-service-data/source-inventory.sha256
@@ -85,14 +202,14 @@ sources/keykey-prepopulated-service-data/source-inventory.sha256
 
 ### keykey-module-cin
 
-- Name: KeyKey module CIN tables
-- Local source: `sources/keykey-module-cin/vendor/`
-- Upstream source directory: <https://github.com/vChewing/KeyKey-Boneyard/tree/master/YahooKeyKey-Source-1.1.2528/DataTables>
-- License: BSD-3-Clause-style Yahoo! KeyKey upstream license / Public Domain source tables
-- Attribution: Yahoo! Inc., OpenVanilla contributors, opendesktop.org.tw CIN contributors, KeyKey Boneyard / ChiaKey maintainers
-- Redistribution decision: included for public releases starting in `2026.06.6`
+- 名稱：KeyKey module CIN tables
+- 本地來源：`sources/keykey-module-cin/vendor/`
+- 上游來源目錄：<https://github.com/vChewing/KeyKey-Boneyard/tree/master/YahooKeyKey-Source-1.1.2528/DataTables>
+- 授權：BSD-3-Clause 風格的 Yahoo! KeyKey 上游授權 / Public Domain source tables
+- 署名：Yahoo! Inc., OpenVanilla contributors, opendesktop.org.tw CIN contributors, KeyKey Boneyard / ChiaKey maintainers
+- 再散布決策：自 `2026.06.6` 起納入公開 release
 
-This source restores module SQLite tables used by KeyKey runtime modules outside the Smart Mandarin language model:
+這個來源恢復 KeyKey runtime 在 Smart Mandarin language model 之外會使用的 module SQLite tables：
 
 ```text
 Generic-cj-cin
@@ -102,180 +219,165 @@ Punctuations-cj-mixedwidth-cin
 BopomofoCorrection-bopomofo-correction-cin
 ```
 
-The generated source inventory is stored at:
+產生的 source inventory 存放於：
 
 ```text
 sources/keykey-module-cin/source-inventory.sha256
 ```
 
-## Included Starting in 2026.06.9
+## 自 2026.06.7 起納入
+
+### opencc-variant-policy
+
+- 名稱：OpenCC-derived Traditional Chinese variant policy
+- 本地來源：`sources/opencc-variant-policy/variant-demotions.tsv`
+- 上游參考：<https://github.com/BYVoid/OpenCC>
+- 授權：Apache-2.0-derived policy
+- 署名：OpenCC contributors; ChiaKey Lexicon maintainers
+- 再散布決策：自 `2026.06.7` 起納入公開 release
+
+這個來源是由 OpenCC 簡繁轉換知識衍生的小型 reviewed policy table。它不會被當作 frequency dictionary 匯入；release builder 只在簡體或非台灣偏好的 variants 原本會與繁體候選 tie 時降低其排序。
+
+第一列會降低 `个`，也就是 `個` 的簡體 counterpart，讓 neutral-tone `ㄍㄜ˙` / `ek7` 不會只因 tie-break 排在 `個` 前面。
+
+## 自 2026.06.9 起納入
 
 ### chiakey-symbols-overlay
 
-- Name: ChiaKey supplemental symbol list
-- Local source: `sources/chiakey-symbols-overlay/symbols.tsv`
-- License: CC0-1.0
-- Attribution: ChiaKey Lexicon maintainers
-- Redistribution decision: included for public releases starting in `2026.06.9`
+- 名稱：ChiaKey supplemental symbol list
+- 本地來源：`sources/chiakey-symbols-overlay/symbols.tsv`
+- 授權：CC0-1.0
+- 署名：ChiaKey Lexicon maintainers
+- 再散布決策：自 `2026.06.9` 起納入公開 release
 
-This source supplements the original KeyKey punctuation list with project-owned
-symbols that are useful in modern text input: extended punctuation, currency
-signs, legal and trademark marks, CJK symbols, enclosed numbers, roman numeral
-variants, additional arrows, mathematical operators and relations, check marks,
-stars, card suits, music symbols, and units.
+這個來源用專案自有符號補強原始 KeyKey punctuation list，涵蓋現代文字輸入常用的 extended punctuation、貨幣符號、法律與商標符號、CJK 符號、圈號數字、羅馬數字變體、補充箭頭、數學運算與關係符號、勾叉、星號、撲克牌花色、音樂符號與單位符號。
 
-The release builder imports this source only as `_punctuation_list` rows. It is
-loaded after `keykey-punctuations-cin`, and skips any symbol already present in
-the Yahoo KeyKey punctuation list so the original ordering and direct
-punctuation key mappings are preserved.
+release builder 只把這個來源匯入為 `_punctuation_list` rows。它會在 `keykey-punctuations-cin` 之後載入，並跳過 Yahoo KeyKey punctuation list 已有的符號，以保留原始排序與直接標點 key mappings。
 
-The generated source inventory is stored at:
+同一份來源也會用來在 `prepopulated_service_data/canned_messages` 中產生多個補充 canned-message button categories，因為 app 的符號表讀取 canned messages，而不是直接查詢 `_punctuation_list`。產生的分類為 `補充標點`、`貨幣與標記`、`數字序號`、`補充箭頭`、`補充數學`、`勾叉與星號`、`花色與音樂`、`單位符號`。
+
+產生的 source inventory 存放於：
 
 ```text
 sources/chiakey-symbols-overlay/source-inventory.sha256
 ```
 
-## Excluded from v1
+### mozc-emoticon-data
 
-These sources are useful references, but they are not included as raw sources in the first release artifacts:
+- 名稱：Mozc emoticon data
+- 本地來源：
+  - `sources/mozc-emoticon-data/raw/categorized.tsv`
+  - `sources/mozc-emoticon-data/raw/emoticon.tsv`
+- 上游來源目錄：<https://github.com/google/mozc/tree/master/src/data/emoticon>
+- 上游 commit：`28da5a39f9a7fd70251c85d269f4a8b47aa31cf8`
+- 授權：BSD-3-Clause
+- 署名：Google and Mozc contributors
+- 再散布決策：自 `2026.06.9` 起納入公開 release
 
-- Yahoo search terms from the historical data package.
-- Sinica Corpus raw material.
-- Commercial CEROD / SQLite extension assets.
-- CC-CEDICT, moedict, Wikimedia, Tatoeba, wordfreq, SUBTLEX-CH, Google Books Ngram, and Google Chinese Web 5-gram.
+這個來源取代原始 KeyKey 的 `顏文字` canned-message category。release builder 會先讀取 `categorized.tsv`，再從 `emoticon.tsv` 追加不重複的 emoticon values。輸出到 `prepopulated_service_data/canned_messages` 時只使用第一欄，也就是顏文字本體；日文 reading keys、categories 與 descriptions 只保留作為 source context。
 
-Some bootstrap files inherited from the open KeyKey Boneyard tree have historical names such as `Yahoo.txt` or `SinicaCorpusOverrides.txt`. In v1, these are treated as part of the BSD-style Boneyard bootstrap source. The repository does not copy private raw Yahoo search logs, Sinica corpus files, or CEROD binaries.
+產生的分類刻意維持為一般 `Messages` list，不使用 `IsSymbolButtonList` 也不使用 `Buttons`，因為原始顏文字 UX 是 list。這能避免符號表 UI 顯示 Yahoo 時代 canned-message data 內附的舊中文註解，同時保留 list interaction。
 
-## Included Starting in 2026.06.2
-
-### chiakey-modern-overlay
-
-- Name: ChiaKey modern overlay phrases
-- Local source:
-  - `sources/chiakey-modern-overlay/phrases.tsv`
-  - `sources/chiakey-modern-overlay/explicit.tsv`
-- License: CC0-1.0
-- Attribution: ChiaKey Lexicon maintainers
-- Redistribution decision: included for public releases
-
-This source is intentionally small and project-owned. It is used for obvious seed lexicon misses discovered during hands-on testing, such as basic input-method phrases that should not depend on a future large frequency corpus.
-
-`phrases.tsv` lets the release builder infer readings from single-character data. `explicit.tsv` is used when a fix depends on a specific KeyKey qstring, such as promoting `個` for neutral-tone `ㄍㄜ˙` / `ek7`.
-
-## Included Starting in 2026.06.7
-
-### opencc-variant-policy
-
-- Name: OpenCC-derived Traditional Chinese variant policy
-- Local source: `sources/opencc-variant-policy/variant-demotions.tsv`
-- Upstream reference: <https://github.com/BYVoid/OpenCC>
-- License: Apache-2.0-derived policy
-- Attribution: OpenCC contributors; ChiaKey Lexicon maintainers
-- Redistribution decision: included for public releases starting in `2026.06.7`
-
-This source is a small reviewed policy table derived from OpenCC's simplified/traditional conversion knowledge. It is not imported as a frequency dictionary. The release builder uses it only to lower Simplified or non-Taiwan-preferred variants when those variants otherwise tie with Traditional Chinese candidates.
-
-The first row demotes `个`, the Simplified counterpart of `個`, so neutral-tone `ㄍㄜ˙` / `ek7` no longer sorts `个` ahead of `個` by tie-break alone.
-
-## Included Starting in 2026.06.3
-
-### libchewing-data
-
-- Name: libchewing-data Traditional Chinese Zhuyin dictionary
-- Local source: `sources/libchewing-data/raw/`
-- Upstream release: <https://github.com/chewing/libchewing-data/releases/tag/v2026.3.22>
-- Current upstream home: <https://codeberg.org/chewing/libchewing-data>
-- License: LGPL-2.1-or-later
-- Attribution: libchewing Core Team
-- Redistribution decision: included for public releases starting in `2026.06.3`
-
-The release builder imports these pinned files:
-
-- `dict/chewing/tsi.csv`
-- `dict/chewing/alt.csv`
-- `dict/chewing/word.csv`
-
-`tsi.csv` and `alt.csv` are imported as the main modern phrase layer because they include explicit Zhuyin readings. For phrases present in libchewing-data, the builder replaces older inferred phrase readings from the bootstrap database with libchewing's explicit readings. `word.csv` is used only to add missing single-character readings.
-
-Starting in `2026.06.5`, single-character rows from `tsi.csv` are also imported as a character-frequency correction layer. This lets common characters such as `我` keep their libchewing frequency instead of tying with rare same-reading characters from the bootstrap database.
-
-The raw files are fetched by:
+產生的 source inventory 存放於：
 
 ```text
-cargo run --release -- fetch-modern-sources
+sources/mozc-emoticon-data/source-inventory.sha256
 ```
 
-The generated source inventory is stored at:
+### chiaki-web-overlay
+
+- 名稱：Chiaki reviewed web corpus overlay
+- 本地來源：
+  - `sources/chiaki-web-overlay/explicit.tsv`
+  - `sources/chiaki-web-overlay/bigrams.tsv`
+- 來源材料：經審查的 web-derived 台灣網路用語材料
+- 授權：審查後的 overlay rows 採 CC0-1.0；source text 不再散布
+- 署名：Chiaki.C
+- 再散布決策：納入 ChiaKey 公開 release；其他專案或非 ChiaKey 用途預設應排除此來源，除非自行完成 source review
+
+這個來源是窄範圍的 ChiaKey overlay，包含從 web usage material 得出的 reviewed unigram 與 bigram values。repository 只用 release-builder formats 再散布最終 lexicon rows：
 
 ```text
-sources/libchewing-data/source-inventory.sha256
+qstring<TAB>phrase<TAB>weight<TAB>tags
+qstring<TAB>previous<TAB>current<TAB>probability
 ```
 
-### bpmf-ext-cin
+release builder 會在 `chiakey-modern-overlay` 之後匯入 unigram rows，並在 synthetic 與 Common Voice bigrams 之後匯入 bigram rows。
 
-- Name: Public domain extended BPMF character table
-- Local source: `sources/bpmf-ext-cin/vendor/bpmf-ext.cin`
-- Upstream source file: <https://github.com/vChewing/KeyKey-Boneyard/blob/master/YahooKeyKey-Source-1.1.2528/DataTables/bpmf-ext.cin>
-- License: Public Domain, per source file header
-- Attribution: opendesktop.org.tw phone.cin contributors; KeyKey Boneyard maintainers
-- Redistribution decision: included for public releases starting in `2026.06.5`
-
-This source is imported after libchewing-data and before Rime essay. The release builder uses it only as a low-priority single-character reading supplement:
-
-1. It imports CJK BMP characters only.
-2. It excludes non-BMP and private-use characters.
-3. It only adds missing exact `(reading, character)` pairs.
-4. It does not override libchewing character frequencies.
-
-This fills native/Yahoo character coverage gaps such as the `ㄨㄛˇ` candidate set:
+產生的 source inventory 存放於：
 
 ```text
-我 婐 捰 倭 䂺 婑 䰀 㦱
+sources/chiaki-web-overlay/source-inventory.sha256
 ```
 
-The generated source inventory is stored at:
+### chiaki-synthetic-overlay
+
+- 名稱：Chiaki.C GPT-5.5 synthetic Taiwan internet usage overlay
+- 本地來源：
+  - `sources/chiaki-synthetic-overlay/unigrams.tsv`
+  - `sources/chiaki-synthetic-overlay/bigrams.tsv`
+- 來源材料：GPT-5.5 產生的 synthetic「台灣網路用語」corpus
+- 授權：CC BY-NC 4.0；商用需取得 Chiaki.C 許可
+- 署名：Chiaki.C
+- 再散布決策：納入公開 source review、open-source project use 與 non-commercial release builds
+
+這個來源包含 Chiaki.C 維護的 synthetic 台灣網路用語 rows。raw synthetic corpus 不在這個 repository 再散布；这里只保留最終 lexicon rows：
 
 ```text
-sources/bpmf-ext-cin/source-inventory.sha256
+qstring<TAB>phrase<TAB>weight<TAB>tags
+qstring<TAB>previous<TAB>current<TAB>probability
 ```
 
-### rime-essay
+bigram file 會先依 release unigram table 做預先篩選，並可包含使用 `!` / `$` qstring markers 的 sentence-boundary rows。
 
-- Name: Rime essay shared vocabulary and language model
-- Local source: `sources/rime-essay/raw/essay.txt`
-- Upstream commit: <https://github.com/rime/rime-essay/tree/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed>
-- License: LGPL-3.0
-- Attribution: Rime essay contributors
-- Redistribution decision: included for public releases starting in `2026.06.3`
-
-Rime essay is imported as a low-priority supplemental phrase layer. It has useful modern vocabulary and scores, but it does not include Zhuyin readings. The release builder therefore imports only entries that satisfy all of these constraints:
-
-1. The phrase is not already present after the libchewing-data import.
-2. The phrase length is between 2 and 7 Unicode codepoints.
-3. The Rime score is at least `40`.
-4. Every character has a primary single-character reading in the current database.
-
-This avoids replacing libchewing's explicit Zhuyin data with inferred readings, while still adding modern terms such as social, news, and technology vocabulary when the reading can be inferred safely enough for a supplemental layer.
-
-The generated source inventory is stored at:
+產生的 source inventory 存放於：
 
 ```text
-sources/rime-essay/source-inventory.sha256
+sources/chiaki-synthetic-overlay/source-inventory.sha256
 ```
 
-## Reading Format
+### openformosa-common-voice-25-zh-tw
 
-The v1 normalized TSV uses the current KeyKey / Manjusri internal `qstring` reading representation in the first column. This is the two-byte-per-syllable ordering string produced by the historical builder's `absolute_order_string` function, not literal Bopomofo text.
+- 名稱：OpenFormosa Common Voice 25 zh-TW bigram overlay
+- 本地來源：`sources/openformosa-common-voice-25-zh-tw/bigrams.tsv`
+- 來源材料：OpenFormosa Common Voice 25 zh-TW validated sentences
+- 上游 dataset：<https://huggingface.co/datasets/OpenFormosa/common_voice_25_zh-TW>
+- 授權：CC0-1.0
+- 署名：OpenFormosa / Mozilla Common Voice contributors
+- 再散布決策：以選出的 runtime bigram rows 納入公開 release
 
-This keeps the first release directly compatible with the current database reader. A later source-normalization pass can add a human-readable Bopomofo column if the builder contract changes.
+這個來源只貢獻選出的 runtime bigram rows。raw Common Voice sentences 不在這個 repository 再散布。
 
-## Current Risk Notes
+產生的 source inventory 存放於：
 
-This release is still a seed lexicon, but it now includes a substantially larger modern Traditional Chinese / Zhuyin layer.
+```text
+sources/openformosa-common-voice-25-zh-tw/source-inventory.sha256
+```
 
-Expected follow-up work:
+## v1 未納入
 
-1. Add Taiwan-specific modern phrases based on actual misses.
-2. Tune the cross-source weight mapping after real typing tests.
-3. Review LGPL redistribution requirements whenever release packaging changes.
-4. Review CC BY-SA and research-only sources before any future public release includes them.
+這些來源可作為有用參考，但第一版 release artifacts 不會把它們當作 raw sources 納入：
+
+- 歷史資料包中的 Yahoo search terms。
+- Sinica Corpus raw material。
+- Commercial CEROD / SQLite extension assets。
+- CC-CEDICT、moedict、Wikimedia、Tatoeba、wordfreq、SUBTLEX-CH、Google Books Ngram、Google Chinese Web 5-gram。
+
+部分繼承自開放 KeyKey Boneyard tree 的 bootstrap files 有 `Yahoo.txt` 或 `SinicaCorpusOverrides.txt` 這類歷史名稱。在 v1 中，這些檔案視為 BSD-style Boneyard bootstrap source 的一部分。repository 不會複製私有 raw Yahoo search logs、Sinica corpus files 或 CEROD binaries。
+
+## 讀音格式
+
+v1 normalized TSV 的第一欄使用目前 KeyKey / Manjusri 內部 `qstring` 讀音表示法。這是歷史 builder 的 `absolute_order_string` function 產生的 two-byte-per-syllable ordering string，不是字面上的注音文字。
+
+這讓第一版 release 能直接相容目前的 database reader。若 builder contract 之後改變，後續 source-normalization pass 可以再加入 human-readable Bopomofo column。
+
+## 目前風險註記
+
+這個 release 仍是 seed lexicon，但已包含大幅擴充的現代繁中 / 注音層。
+
+預期後續工作：
+
+1. 依實際缺漏加入台灣現代用語。
+2. 依真實打字測試調整跨來源權重映射。
+3. release packaging 變動時重新檢查 LGPL 再散布要求。
+4. 未來公開 release 若要納入 CC BY-SA 或 research-only sources，需先完成審查。
