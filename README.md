@@ -31,10 +31,11 @@
 
 合併到 `main` 後，會透過 GitHub Actions 建置並發布版本化詞庫 release。
 
-詳細請見：
+更多說明請見：
 
 - [Docs/ReleaseFlow.zh-TW.md](Docs/ReleaseFlow.zh-TW.md)
 - [Docs/SourceReview.md](Docs/SourceReview.md)
+- [Docs/WalkerScoring.zh-TW.md](Docs/WalkerScoring.zh-TW.md)
 
 若要建立本機檢查用 package 請執行：
 

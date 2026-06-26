@@ -45,6 +45,30 @@ LEXICON_VERSION=2026.06.4 cargo run --release -- prepare-release
 BONEYARD_DB=/path/to/KeyKeySource.db cargo run --release -- prepare-release
 ```
 
+## 本機安裝到 active（輸入法測試）
+
+要讓本機輸入法載入剛建好的 dev 詞庫，用：
+
+```sh
+scripts/install-dev-lexicon.sh            # build + 備份 + 安裝 + 切換 active
+scripts/install-dev-lexicon.sh --no-build # 直接安裝現有的 dist/dev build
+```
+
+腳本會把 `dist/dev/` 的產物改名搬進 active 佈局（輸入法跟著 `active` symlink 載入）：
+
+```text
+~/Library/Application Support/ChiaKey/Lexicons/
+├── active                  -> versions/local-dev   （symlink）
+└── versions/
+    ├── local-dev/
+    │   ├── ChiaKeySource.db          ← dist/dev/KeyKeySource-dev.db
+    │   ├── metadata.json             ← dist/dev/KeyKeySource-dev.json
+    │   └── lexicon-manifest.json
+    └── local-dev-backup-<timestamp>/ ← 覆蓋前自動備份的舊 slot
+```
+
+可用環境變數覆寫：`ACTIVE_ROOT`（active 根目錄）、`SLOT`（版本槽名，預設 `local-dev`）。安裝後重啟輸入法或重新切換輸入來源即可載入新 DB。
+
 ## 版本規則
 
 公開 release tag 使用：
