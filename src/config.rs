@@ -40,6 +40,8 @@ pub const LIBCHEWING_SOURCE_ID: &str = "libchewing-data";
 pub const LIBCHEWING_SOURCE_NAME: &str = "libchewing-data Traditional Chinese Zhuyin dictionary";
 pub const RIME_ESSAY_SOURCE_ID: &str = "rime-essay";
 pub const RIME_ESSAY_SOURCE_NAME: &str = "Rime essay shared vocabulary and language model";
+pub const RIME_CONVERSION_SOURCE_ID: &str = "chiakey-rime-conversion-policy";
+pub const RIME_CONVERSION_SOURCE_NAME: &str = "ChiaKey Rime conversion policy";
 pub const OVERLAY_SOURCE_ID: &str = "chiakey-modern-overlay";
 pub const OVERLAY_SOURCE_NAME: &str = "ChiaKey modern overlay phrases";
 pub const CHIAKI_WEB_OVERLAY_SOURCE_ID: &str = "chiaki-web-overlay";
@@ -134,7 +136,7 @@ pub struct Config {
 pub fn load() -> Result<Config> {
     let root = env::current_dir().context("read current directory")?;
     let release_version = env_or("LEXICON_VERSION", DEFAULT_RELEASE_VERSION);
-    let language_model_version = format!("chiakey-modern-{release_version}");
+    let language_model_version = release_version.clone();
     let minimum_app_version = env_or("MINIMUM_APP_VERSION", "0.1.0");
     let generated_at = env::var("GENERATED_AT")
         .unwrap_or_else(|_| chrono::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true));

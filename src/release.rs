@@ -139,7 +139,13 @@ pub fn run() -> Result<()> {
     )?;
     import_chiaki_synthetic_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
     import_openformosa_common_voice_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
-    import_chiaki_web_bigrams(&mut conn, &cfg, &paths, &mut import_results)?;
+    import_chiaki_web_bigrams(
+        &mut conn,
+        &cfg,
+        &paths,
+        &mut source_keys,
+        &mut import_results,
+    )?;
     import_punctuations(
         &mut conn,
         &cfg,
@@ -226,6 +232,7 @@ fn verify_inputs(
         paths.opencc_variant_demotions.clone(),
         paths.fragment_demotions.clone(),
         paths.rime_essay_raw.clone(),
+        paths.rime_conversion_replacements.clone(),
     ];
     required.extend(module_cin_files(paths));
     required.extend(libchewing_files.iter().map(|entry| entry.path.clone()));
@@ -246,6 +253,7 @@ fn create_output_dirs(cfg: &Config, paths: &ReleasePaths) -> Result<()> {
     fs::create_dir_all(&paths.bpmf_ext_source_dir)?;
     fs::create_dir_all(&paths.libchewing_source_dir)?;
     fs::create_dir_all(&paths.rime_essay_source_dir)?;
+    fs::create_dir_all(&paths.rime_conversion_source_dir)?;
     fs::create_dir_all(&paths.overlay_source_dir)?;
     fs::create_dir_all(&paths.chiaki_web_overlay_source_dir)?;
     fs::create_dir_all(&paths.chiaki_synthetic_source_dir)?;
@@ -315,6 +323,12 @@ fn write_source_inventories(
         &paths.rime_essay_inventory,
         &paths.rime_essay_source_dir,
         std::slice::from_ref(&paths.rime_essay_raw),
+        true,
+    )?;
+    write_inventory(
+        &paths.rime_conversion_inventory,
+        &paths.rime_conversion_source_dir,
+        std::slice::from_ref(&paths.rime_conversion_replacements),
         true,
     )?;
     write_inventory(
@@ -648,12 +662,15 @@ fn import_rime(
     let char_readings = db::load_primary_character_readings(conn)?;
     let existing_phrases = db::load_existing_phrases(conn)?;
     let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
+    let (conversion_rules, _conversion_seen, _conversion_skipped) =
+        importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
     let (records, seen, skipped) = importers::parse_rime_essay(
         &paths.rime_essay_raw,
         cfg,
         &char_readings,
         &existing_phrases,
         &existing_qstring_weights,
+        &conversion_rules,
     )?;
     let result = db::apply_records(
         conn,
@@ -711,8 +728,14 @@ fn import_rime_overlap_rerank(
     import_results: &mut Vec<ImportResult>,
 ) -> Result<()> {
     let existing_records = db::load_existing_phrase_weights(conn)?;
-    let (records, seen, skipped) =
-        importers::parse_rime_overlap_reranks(&paths.rime_essay_raw, cfg, &existing_records)?;
+    let (conversion_rules, _conversion_seen, _conversion_skipped) =
+        importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
+    let (records, seen, skipped) = importers::parse_rime_overlap_reranks(
+        &paths.rime_essay_raw,
+        cfg,
+        &existing_records,
+        &conversion_rules,
+    )?;
     let result = db::apply_records(
         conn,
         records,
@@ -740,11 +763,14 @@ fn import_rime_existing_phrase_rerank(
 ) -> Result<()> {
     let existing_records = db::load_existing_phrase_weights(conn)?;
     let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
+    let (conversion_rules, _conversion_seen, _conversion_skipped) =
+        importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
     let (records, seen, skipped) = importers::parse_rime_existing_phrase_reranks(
         &paths.rime_essay_raw,
         cfg,
         &existing_records,
         &existing_qstring_weights,
+        &conversion_rules,
     )?;
     let result = db::apply_records(
         conn,
@@ -968,10 +994,37 @@ fn import_chiaki_web_bigrams(
     conn: &mut Connection,
     cfg: &Config,
     paths: &ReleasePaths,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
     import_results: &mut Vec<ImportResult>,
 ) -> Result<()> {
     let (records, seen, skipped) =
         importers::parse_bigram_overlay(&paths.chiaki_web_overlay_bigrams, cfg)?;
+    let existing_phrases = db::load_existing_phrases(conn)?;
+    let qstring_weights = db::load_best_qstring_weights(conn)?;
+    let phrase_weights = db::load_best_unigram_weights_by_current(conn)?;
+    let joined_records = importers::joined_phrase_records_from_bigrams(
+        &records,
+        &existing_phrases,
+        &qstring_weights,
+        &phrase_weights,
+        cfg.max_phrase_codepoints,
+        config::CHIAKI_WEB_OVERLAY_SOURCE_ID,
+    );
+    let joined_seen = records.len();
+    let joined_skipped = joined_seen.saturating_sub(joined_records.len());
+    let joined_result = db::apply_records(
+        conn,
+        joined_records,
+        "generated/chiaki-web-bigram-joined-phrases",
+        "chiaki-web-bigram-joined-phrases",
+        &sha256_file(&paths.chiaki_web_overlay_bigrams)?,
+        joined_seen,
+        joined_skipped,
+        false,
+    )?;
+    remember_records(source_keys, &joined_result);
+    import_results.push(joined_result);
+
     let result = db::apply_bigram_records(
         conn,
         &records,
