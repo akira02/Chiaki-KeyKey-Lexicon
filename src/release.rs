@@ -60,10 +60,12 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
+    let normalized_rime = prepare_rime_essay(&cfg, &paths)?;
     import_rime_overlap_rerank(
         &mut conn,
         &cfg,
         &paths,
+        &normalized_rime,
         &mut source_keys,
         &mut import_results,
     )?;
@@ -71,6 +73,7 @@ pub fn run() -> Result<()> {
         &mut conn,
         &cfg,
         &paths,
+        &normalized_rime,
         &mut source_keys,
         &mut import_results,
     )?;
@@ -78,6 +81,7 @@ pub fn run() -> Result<()> {
         &mut conn,
         &cfg,
         &paths,
+        &normalized_rime,
         &mut source_keys,
         &mut import_results,
     )?;
@@ -591,16 +595,10 @@ fn import_bpmf_ext(
     Ok(())
 }
 
-fn import_rime(
-    conn: &mut Connection,
+fn prepare_rime_essay(
     cfg: &Config,
     paths: &ReleasePaths,
-    source_keys: &mut HashMap<(String, String), SourceRecord>,
-    import_results: &mut Vec<ImportResult>,
-) -> Result<()> {
-    let char_readings = db::load_primary_character_readings(conn)?;
-    let existing_phrases = db::load_existing_phrases(conn)?;
-    let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
+) -> Result<importers::NormalizedRimeEssay> {
     let (conversion_rules, _conversion_seen, _conversion_skipped) =
         importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
     let normalization = importers::RimeNormalization::with_opencc(
@@ -608,13 +606,26 @@ fn import_rime(
         &cfg.opencc_binary,
         &cfg.opencc_t2tw_config,
     );
-    let (records, seen, skipped) = importers::parse_rime_essay(
-        &paths.rime_essay_raw,
+    importers::read_normalized_rime_essay(&paths.rime_essay_raw, &normalization)
+}
+
+fn import_rime(
+    conn: &mut Connection,
+    cfg: &Config,
+    paths: &ReleasePaths,
+    normalized_rime: &importers::NormalizedRimeEssay,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let char_readings = db::load_primary_character_readings(conn)?;
+    let existing_phrases = db::load_existing_phrases(conn)?;
+    let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
+    let (records, seen, skipped) = importers::parse_normalized_rime_essay(
+        normalized_rime,
         cfg,
         &char_readings,
         &existing_phrases,
         &existing_qstring_weights,
-        &normalization,
     )?;
     let result = db::apply_records(
         conn,
@@ -668,23 +679,13 @@ fn import_rime_overlap_rerank(
     conn: &mut Connection,
     cfg: &Config,
     paths: &ReleasePaths,
+    normalized_rime: &importers::NormalizedRimeEssay,
     source_keys: &mut HashMap<(String, String), SourceRecord>,
     import_results: &mut Vec<ImportResult>,
 ) -> Result<()> {
     let existing_records = db::load_existing_phrase_weights(conn)?;
-    let (conversion_rules, _conversion_seen, _conversion_skipped) =
-        importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
-    let normalization = importers::RimeNormalization::with_opencc(
-        &conversion_rules,
-        &cfg.opencc_binary,
-        &cfg.opencc_t2tw_config,
-    );
-    let (records, seen, skipped) = importers::parse_rime_overlap_reranks(
-        &paths.rime_essay_raw,
-        cfg,
-        &existing_records,
-        &normalization,
-    )?;
+    let (records, seen, skipped) =
+        importers::parse_normalized_rime_overlap_reranks(normalized_rime, cfg, &existing_records)?;
     let result = db::apply_records(
         conn,
         records,
@@ -707,24 +708,17 @@ fn import_rime_existing_phrase_rerank(
     conn: &mut Connection,
     cfg: &Config,
     paths: &ReleasePaths,
+    normalized_rime: &importers::NormalizedRimeEssay,
     source_keys: &mut HashMap<(String, String), SourceRecord>,
     import_results: &mut Vec<ImportResult>,
 ) -> Result<()> {
     let existing_records = db::load_existing_phrase_weights(conn)?;
     let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
-    let (conversion_rules, _conversion_seen, _conversion_skipped) =
-        importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
-    let normalization = importers::RimeNormalization::with_opencc(
-        &conversion_rules,
-        &cfg.opencc_binary,
-        &cfg.opencc_t2tw_config,
-    );
-    let (records, seen, skipped) = importers::parse_rime_existing_phrase_reranks(
-        &paths.rime_essay_raw,
+    let (records, seen, skipped) = importers::parse_normalized_rime_existing_phrase_reranks(
+        normalized_rime,
         cfg,
         &existing_records,
         &existing_qstring_weights,
-        &normalization,
     )?;
     let result = db::apply_records(
         conn,

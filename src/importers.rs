@@ -48,6 +48,12 @@ struct OpenccNormalization<'a> {
     config: &'a Path,
 }
 
+pub struct NormalizedRimeEssay {
+    entries: Vec<RimeEssayEntry>,
+    seen: usize,
+    skipped: usize,
+}
+
 struct RimeEssayEntry {
     phrase: String,
     score: i64,
@@ -119,6 +125,7 @@ pub fn parse_libchewing_csv(
     Ok((dedupe_records(records), seen, skipped))
 }
 
+#[cfg(test)]
 pub fn parse_rime_essay(
     path: &Path,
     cfg: &Config,
@@ -127,12 +134,30 @@ pub fn parse_rime_essay(
     existing_qstring_weights: &HashMap<String, f64>,
     normalization: &RimeNormalization<'_>,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    let normalized = read_normalized_rime_essay(path, normalization)?;
+    parse_normalized_rime_essay(
+        &normalized,
+        cfg,
+        char_readings,
+        existing_phrases,
+        existing_qstring_weights,
+    )
+}
+
+pub fn parse_normalized_rime_essay(
+    normalized: &NormalizedRimeEssay,
+    cfg: &Config,
+    char_readings: &HashMap<String, String>,
+    existing_phrases: &HashSet<String>,
+    existing_qstring_weights: &HashMap<String, f64>,
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
     let mut raw_rows: Vec<(String, i64, String, usize, Vec<String>)> = Vec::new();
-    let (entries, seen, mut skipped) = read_normalized_rime_essay(path, normalization)?;
+    let seen = normalized.seen;
+    let mut skipped = normalized.skipped;
     let mut max_score = 1;
 
-    for entry in entries {
-        let phrase = entry.phrase;
+    for entry in &normalized.entries {
+        let phrase = entry.phrase.clone();
         let score = entry.score;
         if score < cfg.rime_essay_min_score
             || !phrase_candidate(&phrase, 2, cfg.max_phrase_codepoints)
@@ -166,7 +191,7 @@ pub fn parse_rime_essay(
             score,
             qstring,
             syllable_count,
-            entry.conversion_tags,
+            entry.conversion_tags.clone(),
         ));
     }
 
@@ -312,17 +337,28 @@ pub fn parse_single_char_homophone_reranks(
     Ok((dedupe_records(records), seen, skipped))
 }
 
+#[cfg(test)]
 pub fn parse_rime_overlap_reranks(
     path: &Path,
     cfg: &Config,
     existing_records: &[(String, String, f64)],
     normalization: &RimeNormalization<'_>,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
-    let mut rime_scores: HashMap<String, RimeScore> = HashMap::new();
-    let (entries, seen, mut skipped) = read_normalized_rime_essay(path, normalization)?;
+    let normalized = read_normalized_rime_essay(path, normalization)?;
+    parse_normalized_rime_overlap_reranks(&normalized, cfg, existing_records)
+}
 
-    for entry in entries {
-        let phrase = entry.phrase;
+pub fn parse_normalized_rime_overlap_reranks(
+    normalized: &NormalizedRimeEssay,
+    cfg: &Config,
+    existing_records: &[(String, String, f64)],
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    let mut rime_scores: HashMap<String, RimeScore> = HashMap::new();
+    let seen = normalized.seen;
+    let mut skipped = normalized.skipped;
+
+    for entry in &normalized.entries {
+        let phrase = entry.phrase.clone();
         let score = entry.score;
         if score < cfg.rime_essay_min_score
             || !phrase_candidate(&phrase, 2, cfg.max_phrase_codepoints)
@@ -413,6 +449,7 @@ pub fn parse_rime_overlap_reranks(
     Ok((dedupe_records(records), seen, skipped))
 }
 
+#[cfg(test)]
 pub fn parse_rime_existing_phrase_reranks(
     path: &Path,
     cfg: &Config,
@@ -420,12 +457,28 @@ pub fn parse_rime_existing_phrase_reranks(
     existing_qstring_weights: &HashMap<String, f64>,
     normalization: &RimeNormalization<'_>,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
+    let normalized = read_normalized_rime_essay(path, normalization)?;
+    parse_normalized_rime_existing_phrase_reranks(
+        &normalized,
+        cfg,
+        existing_records,
+        existing_qstring_weights,
+    )
+}
+
+pub fn parse_normalized_rime_existing_phrase_reranks(
+    normalized: &NormalizedRimeEssay,
+    cfg: &Config,
+    existing_records: &[(String, String, f64)],
+    existing_qstring_weights: &HashMap<String, f64>,
+) -> Result<(Vec<SourceRecord>, usize, usize)> {
     let mut rime_scores: HashMap<String, RimeScore> = HashMap::new();
-    let (entries, seen, mut skipped) = read_normalized_rime_essay(path, normalization)?;
+    let seen = normalized.seen;
+    let mut skipped = normalized.skipped;
     let mut max_score = 1;
 
-    for entry in entries {
-        let phrase = entry.phrase;
+    for entry in &normalized.entries {
+        let phrase = entry.phrase.clone();
         let score = entry.score;
         if score < cfg.rime_essay_min_score
             || !phrase_candidate(&phrase, 2, cfg.max_phrase_codepoints)
@@ -977,10 +1030,10 @@ pub fn format_weight(value: f64) -> String {
     }
 }
 
-fn read_normalized_rime_essay(
+pub fn read_normalized_rime_essay(
     path: &Path,
     normalization: &RimeNormalization<'_>,
-) -> Result<(Vec<RimeEssayEntry>, usize, usize)> {
+) -> Result<NormalizedRimeEssay> {
     let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
     let reader = BufReader::new(file);
     let mut rows = Vec::new();
@@ -1034,7 +1087,11 @@ fn read_normalized_rime_essay(
         })
         .collect();
 
-    Ok((entries, seen, skipped))
+    Ok(NormalizedRimeEssay {
+        entries,
+        seen,
+        skipped,
+    })
 }
 
 fn apply_conversion_rules(

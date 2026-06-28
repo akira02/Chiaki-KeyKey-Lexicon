@@ -43,6 +43,8 @@ To build a local verification package:
 cargo run --release -- prepare-release
 ```
 
+`prepare-release` requires the OpenCC CLI. Rime essay phrases are normalized with `t2tw` before project-specific override rules are applied. `OPENCC_BINARY` and `OPENCC_T2TW_CONFIG` can override the default `opencc` / `t2tw.json` commands.
+
 Public releases do not require manual version edits in the repo; GitHub Actions computes the next `YYYY.MM.N` from existing tags.
 
 ## Architecture
@@ -100,7 +102,7 @@ Goal: project-maintained lexicon data that directly reflects ChiaKey usage conte
 
 Goal: map external evidence into default zh-TW output expectations and suppress known segmentation risks.
 
-- `chiakey-rime-conversion-policy`: fixes Rime conversion forms (for example, `喫壞` -> `吃壞`).
+- `chiakey-rime-conversion-policy`: post-OpenCC Rime overrides for cases `t2tw` cannot safely decide, such as `里` in place names and `里肌` food terms.
 - `opencc-variant-policy`: variant weight-cap policy to avoid simplified or non-Taiwan-preferred forms surfacing too early.
 - `chiakey-fragment-denylist`: fragment weight caps to reduce bad segmentation from non-lexical shards.
 
@@ -114,7 +116,7 @@ The release builder integration flow is deterministic:
 2. Copy cooked `KeyKeySource.db` from `keykey-boneyard-bootstrap` as the base.
 3. Import `libchewing-data` to strengthen modern vocabulary with explicit Zhuyin readings; overlapping bootstrap phrases are replaced by libchewing data.
 4. Import `bpmf-ext-cin` to fill missing single-character readings without overwriting existing rows.
-5. Load `chiakey-rime-conversion-policy` before Rime phrases are used as rerank evidence or supplemental terms.
+5. Batch-normalize Rime essay phrases with OpenCC `t2tw`, then apply the small `chiakey-rime-conversion-policy` override table; the normalized result is shared by Rime rerank and supplemental import passes.
 6. Apply `rime-essay` rerank: cap same-pronunciation boosts, allow limited uplift from Rime evidence for weak existing phrases, apply small single-character homophone reorders where frequency advantage is sufficient, then import only safe supplemental phrases not already in DB.
 7. Import `chiakey-modern-overlay/phrases.tsv` so project-owned fixes can replace known problematic phrases.
 8. Import `chiakey-modern-overlay/explicit.tsv` for explicit qstring and ranking corrections.

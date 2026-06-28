@@ -22,6 +22,8 @@
 cargo run --release -- prepare-release
 ```
 
+`prepare-release` 需要本機可執行 OpenCC CLI。預設使用 `opencc -c t2tw.json` 正規化 Rime essay；如需指定路徑，可覆寫 `OPENCC_BINARY` 與 `OPENCC_T2TW_CONFIG`。
+
 未設定 `LEXICON_VERSION` 時會使用 `dev` placeholder，預設輸出：
 
 ```text

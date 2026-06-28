@@ -104,6 +104,8 @@ sources/libchewing-data/source-inventory.sha256
 
 Rime essay 有可用的現代詞彙與分數，但不包含注音讀音。因此 release builder 只會在另一個來源已提供讀音後使用它。
 
+Rime essay phrase 進入 rerank 與 supplemental 匯入前，會先以 OpenCC `t2tw` 批次正規化為台灣標準繁體。`sources/chiakey-rime-conversion-policy/replacements.tsv` 只作為 `t2tw` 後的專案例外表，保留 OpenCC 無法安全判斷的地名 `里` 與食物詞 `里肌` 等偏好，不再維護一般異體字轉換清單。
+
 首先，overlap rerank pass 會用 Rime scores 提升同一 KeyKey qstring group 內的既有候選。這個 pass 只會把較低排序的候選提升到足以尊重 Rime ordering，不會 demote 既有 rows，也會限制 promotion，避免 Rime 把 ambiguous candidate 推過既有高頻詞範圍。
 
 另有 single-character homophone rerank pass 會處理 libchewing 單字頻率對同音字近乎攤平的問題。它只在同一單字 qstring group 內比較 Rime essay 單字頻率，而且 Rime winner 與目前 top candidate 都必須有 Rime 單字頻率；預設 winner 至少要有 `5x` 頻率優勢，才會被小幅提升到目前 top 之上。這個 pass 只 raise，不 demote。

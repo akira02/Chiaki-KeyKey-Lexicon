@@ -39,6 +39,8 @@
 cargo run --release -- prepare-release
 ```
 
+`prepare-release` 需要本機可執行 OpenCC CLI，Rime essay 匯入時會先套 `t2tw`，再套專案保留的少量例外規則。可用 `OPENCC_BINARY` 與 `OPENCC_T2TW_CONFIG` 覆寫預設的 `opencc` / `t2tw.json`。
+
 合併到 `main` 後，會透過 GitHub Actions 建置並發布版本化詞庫 release。
 
 ## 架構
@@ -96,7 +98,7 @@ cargo run --release -- prepare-release
 
 目標：把外部證據轉成預設繁中（zh-TW）輸出期待，並抑制已知斷詞風險。
 
-- `chiakey-rime-conversion-policy`：修正 Rime 詞形轉換規則（例如 `喫壞` → `吃壞`）。
+- `chiakey-rime-conversion-policy`：OpenCC `t2tw` 後的 Rime 例外規則，只保留地名 `里`、食物詞 `里肌` 等 `t2tw` 無法安全判斷的專案偏好。
 - `opencc-variant-policy`：variant 權重上限策略（避免簡體或非台灣慣用字前置）。
 - `chiakey-fragment-denylist`：句段碎片權重上限（降低偷字造成的錯誤斷詞）。
 
@@ -109,7 +111,7 @@ release builder 的整合流程是 deterministic 的：
 2. 複製 `keykey-boneyard-bootstrap` 的 cooked `KeyKeySource.db` 作為基底。
 3. 匯入 `libchewing-data`，以明確注音資料補強現代詞彙；libchewing phrase 會替換 bootstrap 中同詞的舊推導資料。
 4. 匯入 `bpmf-ext-cin`，只補缺少的單字讀音，不覆蓋既有資料。
-5. 讀取 `chiakey-rime-conversion-policy`，在 Rime phrase 被用作 rerank evidence 或 supplemental 詞之前先修正常見詞形轉換問題。
+5. 將 Rime essay phrase 批次套用 OpenCC `t2tw`，再讀取 `chiakey-rime-conversion-policy` 套用少量後處理例外；normalized 結果會在 Rime rerank 與 supplemental 匯入之間共用。
 6. 套用 `rime-essay` rerank：同音候選只允許有限幅度提升，既有弱詞可用 Rime 分數與切分證據有限度升權；單字同音群會在 Rime 單字頻率有足夠優勢時小幅重排；接著只加入目前 DB 尚無、且能安全推得注音的補充詞。
 7. 匯入 `chiakey-modern-overlay/phrases.tsv`，讓專案自有修正可以替換已知問題詞。
 8. 匯入 `chiakey-modern-overlay/explicit.tsv`，處理需要指定 qstring 或排序的精準修正。
