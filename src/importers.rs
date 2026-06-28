@@ -2,6 +2,7 @@ use crate::config::{
     Config, CHIAKEY_AUTO_HOTWORDS_SOURCE_ID, CHIAKI_SYNTHETIC_SOURCE_ID,
     CHIAKI_WEB_OVERLAY_SOURCE_ID, LIBCHEWING_SOURCE_ID, OVERLAY_SOURCE_ID, RIME_ESSAY_SOURCE_ID,
 };
+use crate::opencc;
 use crate::phonetics::{phrase_candidate, qstring_for_bpmf_sequence};
 use crate::types::{
     BigramRecord, ConversionRule, LibchewingFile, LibchewingWeightMode, SourceRecord,
@@ -35,6 +36,43 @@ const SINGLE_CHAR_HOMOPHONE_RERANK_MAX_WEIGHT_GAP: f64 = 0.25;
 struct RimeScore {
     score: i64,
     converted: bool,
+}
+
+pub struct RimeNormalization<'a> {
+    conversion_rules: &'a [ConversionRule],
+    opencc: Option<OpenccNormalization<'a>>,
+}
+
+struct OpenccNormalization<'a> {
+    binary: &'a Path,
+    config: &'a Path,
+}
+
+struct RimeEssayEntry {
+    phrase: String,
+    score: i64,
+    conversion_tags: Vec<String>,
+}
+
+impl<'a> RimeNormalization<'a> {
+    #[cfg(test)]
+    pub fn without_opencc(conversion_rules: &'a [ConversionRule]) -> Self {
+        Self {
+            conversion_rules,
+            opencc: None,
+        }
+    }
+
+    pub fn with_opencc(
+        conversion_rules: &'a [ConversionRule],
+        binary: &'a Path,
+        config: &'a Path,
+    ) -> Self {
+        Self {
+            conversion_rules,
+            opencc: Some(OpenccNormalization { binary, config }),
+        }
+    }
 }
 
 pub fn libchewing_max_score(paths: &[PathBuf]) -> Result<i64> {
@@ -87,30 +125,15 @@ pub fn parse_rime_essay(
     char_readings: &HashMap<String, String>,
     existing_phrases: &HashSet<String>,
     existing_qstring_weights: &HashMap<String, f64>,
-    conversion_rules: &[ConversionRule],
+    normalization: &RimeNormalization<'_>,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
-    let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
-    let reader = BufReader::new(file);
     let mut raw_rows: Vec<(String, i64, String, usize, Vec<String>)> = Vec::new();
-    let mut seen = 0;
-    let mut skipped = 0;
+    let (entries, seen, mut skipped) = read_normalized_rime_essay(path, normalization)?;
     let mut max_score = 1;
 
-    for line in reader.lines() {
-        let line = line?;
-        if line.trim().is_empty() || line.starts_with('#') {
-            continue;
-        }
-        seen += 1;
-        let Some((phrase, score_text)) = line.split_once('\t') else {
-            skipped += 1;
-            continue;
-        };
-        let Some(score) = parse_i64(score_text) else {
-            skipped += 1;
-            continue;
-        };
-        let (phrase, conversion_tags) = apply_conversion_rules(phrase, conversion_rules);
+    for entry in entries {
+        let phrase = entry.phrase;
+        let score = entry.score;
         if score < cfg.rime_essay_min_score
             || !phrase_candidate(&phrase, 2, cfg.max_phrase_codepoints)
             || existing_phrases.contains(&phrase)
@@ -138,7 +161,13 @@ pub fn parse_rime_essay(
         }
 
         max_score = max_score.max(score);
-        raw_rows.push((phrase, score, qstring, syllable_count, conversion_tags));
+        raw_rows.push((
+            phrase,
+            score,
+            qstring,
+            syllable_count,
+            entry.conversion_tags,
+        ));
     }
 
     let records = raw_rows
@@ -287,29 +316,14 @@ pub fn parse_rime_overlap_reranks(
     path: &Path,
     cfg: &Config,
     existing_records: &[(String, String, f64)],
-    conversion_rules: &[ConversionRule],
+    normalization: &RimeNormalization<'_>,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
-    let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
-    let reader = BufReader::new(file);
     let mut rime_scores: HashMap<String, RimeScore> = HashMap::new();
-    let mut seen = 0;
-    let mut skipped = 0;
+    let (entries, seen, mut skipped) = read_normalized_rime_essay(path, normalization)?;
 
-    for line in reader.lines() {
-        let line = line?;
-        if line.trim().is_empty() || line.starts_with('#') {
-            continue;
-        }
-        seen += 1;
-        let Some((phrase, score_text)) = line.split_once('\t') else {
-            skipped += 1;
-            continue;
-        };
-        let Some(score) = parse_i64(score_text) else {
-            skipped += 1;
-            continue;
-        };
-        let (phrase, conversion_tags) = apply_conversion_rules(phrase, conversion_rules);
+    for entry in entries {
+        let phrase = entry.phrase;
+        let score = entry.score;
         if score < cfg.rime_essay_min_score
             || !phrase_candidate(&phrase, 2, cfg.max_phrase_codepoints)
         {
@@ -322,15 +336,15 @@ pub fn parse_rime_overlap_reranks(
                 if score > existing.score {
                     *existing = RimeScore {
                         score,
-                        converted: !conversion_tags.is_empty(),
+                        converted: !entry.conversion_tags.is_empty(),
                     };
                 } else if score == existing.score {
-                    existing.converted |= !conversion_tags.is_empty();
+                    existing.converted |= !entry.conversion_tags.is_empty();
                 }
             })
             .or_insert(RimeScore {
                 score,
-                converted: !conversion_tags.is_empty(),
+                converted: !entry.conversion_tags.is_empty(),
             });
     }
 
@@ -404,30 +418,15 @@ pub fn parse_rime_existing_phrase_reranks(
     cfg: &Config,
     existing_records: &[(String, String, f64)],
     existing_qstring_weights: &HashMap<String, f64>,
-    conversion_rules: &[ConversionRule],
+    normalization: &RimeNormalization<'_>,
 ) -> Result<(Vec<SourceRecord>, usize, usize)> {
-    let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
-    let reader = BufReader::new(file);
     let mut rime_scores: HashMap<String, RimeScore> = HashMap::new();
-    let mut seen = 0;
-    let mut skipped = 0;
+    let (entries, seen, mut skipped) = read_normalized_rime_essay(path, normalization)?;
     let mut max_score = 1;
 
-    for line in reader.lines() {
-        let line = line?;
-        if line.trim().is_empty() || line.starts_with('#') {
-            continue;
-        }
-        seen += 1;
-        let Some((phrase, score_text)) = line.split_once('\t') else {
-            skipped += 1;
-            continue;
-        };
-        let Some(score) = parse_i64(score_text) else {
-            skipped += 1;
-            continue;
-        };
-        let (phrase, conversion_tags) = apply_conversion_rules(phrase, conversion_rules);
+    for entry in entries {
+        let phrase = entry.phrase;
+        let score = entry.score;
         if score < cfg.rime_essay_min_score
             || !phrase_candidate(&phrase, 2, cfg.max_phrase_codepoints)
         {
@@ -441,15 +440,15 @@ pub fn parse_rime_existing_phrase_reranks(
                 if score > existing.score {
                     *existing = RimeScore {
                         score,
-                        converted: !conversion_tags.is_empty(),
+                        converted: !entry.conversion_tags.is_empty(),
                     };
                 } else if score == existing.score {
-                    existing.converted |= !conversion_tags.is_empty();
+                    existing.converted |= !entry.conversion_tags.is_empty();
                 }
             })
             .or_insert(RimeScore {
                 score,
-                converted: !conversion_tags.is_empty(),
+                converted: !entry.conversion_tags.is_empty(),
             });
     }
 
@@ -978,6 +977,66 @@ pub fn format_weight(value: f64) -> String {
     }
 }
 
+fn read_normalized_rime_essay(
+    path: &Path,
+    normalization: &RimeNormalization<'_>,
+) -> Result<(Vec<RimeEssayEntry>, usize, usize)> {
+    let file = File::open(path).with_context(|| format!("read {}", path.display()))?;
+    let reader = BufReader::new(file);
+    let mut rows = Vec::new();
+    let mut seen = 0;
+    let mut skipped = 0;
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        seen += 1;
+        let Some((phrase, score_text)) = line.split_once('\t') else {
+            skipped += 1;
+            continue;
+        };
+        let Some(score) = parse_i64(score_text) else {
+            skipped += 1;
+            continue;
+        };
+        rows.push((phrase.to_string(), score));
+    }
+
+    let phrases = rows
+        .iter()
+        .map(|(phrase, _score)| phrase.clone())
+        .collect::<Vec<_>>();
+    let opencc_phrases = match &normalization.opencc {
+        Some(opencc_config) => {
+            opencc::convert_lines(opencc_config.binary, opencc_config.config, &phrases)?
+        }
+        None => phrases.clone(),
+    };
+
+    let entries = rows
+        .into_iter()
+        .zip(opencc_phrases)
+        .map(|((original_phrase, score), opencc_phrase)| {
+            let mut tags = Vec::new();
+            if original_phrase != opencc_phrase {
+                tags.push("opencc-t2tw,modern-zh-tw,variant-normalization".to_string());
+            }
+            let (phrase, mut override_tags) =
+                apply_conversion_rules(&opencc_phrase, normalization.conversion_rules);
+            tags.append(&mut override_tags);
+            RimeEssayEntry {
+                phrase,
+                score,
+                conversion_tags: tags,
+            }
+        })
+        .collect();
+
+    Ok((entries, seen, skipped))
+}
+
 fn apply_conversion_rules(
     phrase: &str,
     conversion_rules: &[ConversionRule],
@@ -1109,9 +1168,9 @@ mod tests {
         libchewing_weight, parse_bigram_overlay, parse_conversion_rules, parse_explicit_overlay,
         parse_fragment_demotions, parse_rime_essay, parse_rime_existing_phrase_reranks,
         parse_rime_overlap_reranks, parse_single_char_homophone_reranks, parse_variant_demotions,
-        phrase_evidence_character_records, round6, LIBCHEWING_PHRASE_SEGMENT_BONUS,
-        LIBCHEWING_PHRASE_SEGMENT_BONUS_THRESHOLD, RIME_OVERLAP_RERANK_MARGIN,
-        SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN,
+        phrase_evidence_character_records, round6, RimeNormalization,
+        LIBCHEWING_PHRASE_SEGMENT_BONUS, LIBCHEWING_PHRASE_SEGMENT_BONUS_THRESHOLD,
+        RIME_OVERLAP_RERANK_MARGIN, SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN,
     };
     use crate::config::{Config, CHIAKI_WEB_OVERLAY_SOURCE_ID};
     use crate::types::ConversionRule;
@@ -1451,6 +1510,8 @@ mod tests {
             (":j".to_string(), -1.698951),
             ("Ei_d".to_string(), -0.265419),
         ]);
+        let conversion_rules = Vec::new();
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, seen, skipped) = parse_rime_essay(
             &path,
@@ -1458,7 +1519,7 @@ mod tests {
             &char_readings,
             &existing_phrases,
             &existing_qstring_weights,
-            &[],
+            &normalization,
         )
         .unwrap();
         let take_now = records
@@ -1494,6 +1555,8 @@ mod tests {
             ("?]A_".to_string(), -0.341542),
             ("C_?]".to_string(), -0.465907),
         ]);
+        let conversion_rules = Vec::new();
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, _seen, _skipped) = parse_rime_essay(
             &path,
@@ -1501,7 +1564,7 @@ mod tests {
             &char_readings,
             &existing_phrases,
             &existing_qstring_weights,
-            &[],
+            &normalization,
         )
         .unwrap();
         let statistics_system = records
@@ -1536,6 +1599,7 @@ mod tests {
             to: "吃".to_string(),
             tags: "rime-conversion,modern-zh-tw".to_string(),
         }];
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, seen, skipped) = parse_rime_essay(
             &path,
@@ -1543,7 +1607,7 @@ mod tests {
             &char_readings,
             &existing_phrases,
             &existing_qstring_weights,
-            &conversion_rules,
+            &normalization,
         )
         .unwrap();
 
@@ -1578,13 +1642,14 @@ mod tests {
             to: "吃".to_string(),
             tags: "rime-conversion,modern-zh-tw".to_string(),
         }];
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, seen, skipped) = parse_rime_existing_phrase_reranks(
             &path,
             &cfg,
             &existing,
             &existing_qstring_weights,
-            &conversion_rules,
+            &normalization,
         )
         .unwrap();
 
@@ -1610,9 +1675,11 @@ mod tests {
             ("=fBZ".to_string(), "會選".to_string(), -1.215681),
             ("BZ=M".to_string(), "選成".to_string(), -1.640198),
         ];
+        let conversion_rules = Vec::new();
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, seen, skipped) =
-            parse_rime_overlap_reranks(&path, &cfg, &existing, &[]).unwrap();
+            parse_rime_overlap_reranks(&path, &cfg, &existing, &normalization).unwrap();
 
         assert_eq!(seen, 3);
         assert_eq!(skipped, 0);
@@ -1661,9 +1728,11 @@ mod tests {
             ("}FGK".to_string(), "回文".to_string(), -1.062714),
             ("}FGK".to_string(), "迴文".to_string(), -2.302193),
         ];
+        let conversion_rules = Vec::new();
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, seen, skipped) =
-            parse_rime_overlap_reranks(&path, &cfg, &existing, &[]).unwrap();
+            parse_rime_overlap_reranks(&path, &cfg, &existing, &normalization).unwrap();
 
         assert_eq!(seen, 2);
         assert_eq!(skipped, 0);
@@ -1692,13 +1761,15 @@ mod tests {
             ("0\\".to_string(), -1.289465),
             ("NX".to_string(), -0.570839),
         ]);
+        let conversion_rules = Vec::new();
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, seen, skipped) = parse_rime_existing_phrase_reranks(
             &path,
             &cfg,
             &existing,
             &existing_qstring_weights,
-            &[],
+            &normalization,
         )
         .unwrap();
 
@@ -1728,9 +1799,11 @@ mod tests {
             ("0_=_".to_string(), "示例".to_string(), -1.306103),
             ("0_=_".to_string(), "事例".to_string(), -1.306103),
         ];
+        let conversion_rules = Vec::new();
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
 
         let (records, seen, skipped) =
-            parse_rime_overlap_reranks(&path, &cfg, &existing, &[]).unwrap();
+            parse_rime_overlap_reranks(&path, &cfg, &existing, &normalization).unwrap();
 
         assert_eq!(seen, 6);
         assert_eq!(skipped, 0);
@@ -1880,6 +1953,8 @@ mod tests {
             release_base_url: "https://example.invalid".to_string(),
             max_phrase_codepoints: 7,
             rime_essay_min_score: 40,
+            opencc_binary: PathBuf::from("opencc"),
+            opencc_t2tw_config: PathBuf::from("t2tw.json"),
             synthetic_bigram_boost: 0.0,
             commonvoice_bigram_boost: 0.0,
             homophone_rerank_min_ratio: 5.0,

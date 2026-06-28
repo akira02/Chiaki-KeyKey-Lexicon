@@ -120,6 +120,8 @@ pub struct Config {
     pub release_base_url: String,
     pub max_phrase_codepoints: usize,
     pub rime_essay_min_score: i64,
+    pub opencc_binary: PathBuf,
+    pub opencc_t2tw_config: PathBuf,
     // How much each source's strongest collocation should beat its unigram floor
     // when re-anchored to the unigram scale (see importers::calibrate_bigram_boost).
     // 0 = raw passthrough.
@@ -150,6 +152,8 @@ pub fn load() -> Result<Config> {
     let rime_essay_min_score = env_or("RIME_ESSAY_MIN_SCORE", "40")
         .parse()
         .context("parse RIME_ESSAY_MIN_SCORE")?;
+    let opencc_binary = PathBuf::from(env_or("OPENCC_BINARY", "opencc"));
+    let opencc_t2tw_config = PathBuf::from(env_or("OPENCC_T2TW_CONFIG", "t2tw.json"));
     let synthetic_bigram_boost = env_or("SYNTHETIC_BIGRAM_BOOST", "1.5")
         .parse()
         .context("parse SYNTHETIC_BIGRAM_BOOST")?;
@@ -195,6 +199,8 @@ pub fn load() -> Result<Config> {
         release_base_url,
         max_phrase_codepoints,
         rime_essay_min_score,
+        opencc_binary,
+        opencc_t2tw_config,
         synthetic_bigram_boost,
         commonvoice_bigram_boost,
         homophone_rerank_min_ratio,

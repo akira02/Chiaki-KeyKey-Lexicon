@@ -603,13 +603,18 @@ fn import_rime(
     let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
     let (conversion_rules, _conversion_seen, _conversion_skipped) =
         importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
+    let normalization = importers::RimeNormalization::with_opencc(
+        &conversion_rules,
+        &cfg.opencc_binary,
+        &cfg.opencc_t2tw_config,
+    );
     let (records, seen, skipped) = importers::parse_rime_essay(
         &paths.rime_essay_raw,
         cfg,
         &char_readings,
         &existing_phrases,
         &existing_qstring_weights,
-        &conversion_rules,
+        &normalization,
     )?;
     let result = db::apply_records(
         conn,
@@ -669,11 +674,16 @@ fn import_rime_overlap_rerank(
     let existing_records = db::load_existing_phrase_weights(conn)?;
     let (conversion_rules, _conversion_seen, _conversion_skipped) =
         importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
+    let normalization = importers::RimeNormalization::with_opencc(
+        &conversion_rules,
+        &cfg.opencc_binary,
+        &cfg.opencc_t2tw_config,
+    );
     let (records, seen, skipped) = importers::parse_rime_overlap_reranks(
         &paths.rime_essay_raw,
         cfg,
         &existing_records,
-        &conversion_rules,
+        &normalization,
     )?;
     let result = db::apply_records(
         conn,
@@ -704,12 +714,17 @@ fn import_rime_existing_phrase_rerank(
     let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
     let (conversion_rules, _conversion_seen, _conversion_skipped) =
         importers::parse_conversion_rules(&paths.rime_conversion_replacements)?;
+    let normalization = importers::RimeNormalization::with_opencc(
+        &conversion_rules,
+        &cfg.opencc_binary,
+        &cfg.opencc_t2tw_config,
+    );
     let (records, seen, skipped) = importers::parse_rime_existing_phrase_reranks(
         &paths.rime_essay_raw,
         cfg,
         &existing_records,
         &existing_qstring_weights,
-        &conversion_rules,
+        &normalization,
     )?;
     let result = db::apply_records(
         conn,
