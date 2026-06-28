@@ -35,7 +35,7 @@ Release builder 先讀 `categorized.tsv`，再追加 `emoticon.tsv` 中尚未出
 
 授權：BSD-3-Clause
 
-授權檔：`LICENSES/mozc-BSD-3-Clause.txt`
+授權檔：`sources/mozc-emoticon-data/LICENSE`
 
 ## 驗證
 

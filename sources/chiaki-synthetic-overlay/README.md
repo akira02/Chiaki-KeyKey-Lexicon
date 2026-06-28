@@ -53,7 +53,7 @@ stored = min(unigram(current) + boost + (raw - raw_max_of_source), -0.05)
 
 非商業與開源專案可於標示來源為 Chiaki.C 前提下使用；商業用途需另行取得授權。
 
-授權全文見：`LICENSES/chiaki-synthetic-overlay-NC.txt`
+授權全文見：`sources/chiaki-synthetic-overlay/LICENSE`
 
 ## 驗證
 

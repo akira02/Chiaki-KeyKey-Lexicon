@@ -79,8 +79,8 @@ pub const DOWNLOADS: &[SourceDownload] = &[
         sha256: "66df78f53ff18ab97bc39b3f3108a1f6d8d5be3237d9e72ff9f6f7186b4d6b2e",
     },
     SourceDownload {
-        url: "https://raw.githubusercontent.com/chewing/libchewing/v0.12.0/COPYING",
-        path: "LICENSES/libchewing-data-LGPL-2.1-or-later.txt",
+        url: "https://codeberg.org/chewing/libchewing/raw/tag/v0.12.0/COPYING",
+        path: "sources/libchewing-data/COPYING",
         sha256: "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
     },
     SourceDownload {
@@ -90,7 +90,7 @@ pub const DOWNLOADS: &[SourceDownload] = &[
     },
     SourceDownload {
         url: "https://raw.githubusercontent.com/rime/rime-essay/48c7538f0b760fcc8c9d6bf08711f82cfbd2e9ed/LICENSE",
-        path: "LICENSES/rime-essay-LGPL-3.0.txt",
+        path: "sources/rime-essay/LICENSE",
         sha256: "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
     },
     SourceDownload {
@@ -105,7 +105,7 @@ pub const DOWNLOADS: &[SourceDownload] = &[
     },
     SourceDownload {
         url: "https://raw.githubusercontent.com/google/mozc/28da5a39f9a7fd70251c85d269f4a8b47aa31cf8/LICENSE",
-        path: "LICENSES/mozc-BSD-3-Clause.txt",
+        path: "sources/mozc-emoticon-data/LICENSE",
         sha256: "44cdd923b91ea9199293abecc2762c70c87dbf1e581c027a94c416368d1a648c",
     },
 ];

@@ -325,7 +325,7 @@ sources/mozc-emoticon-data/source-inventory.sha256
   - `sources/chiaki-web-overlay/explicit.tsv`
   - `sources/chiaki-web-overlay/bigrams.tsv`
 - 來源材料：經審查的 web-derived 台灣網路用語材料
-- 授權：審查後的 overlay rows 採 CC0-1.0；source text 不再散布
+- 授權：CC BY-NC 4.0；商用需取得 Chiaki.C 許可
 - 署名：Chiaki.C
 - 再散布決策：納入 ChiaKey 公開 release；其他專案或非 ChiaKey 用途預設應排除此來源，除非自行完成 source review
 
