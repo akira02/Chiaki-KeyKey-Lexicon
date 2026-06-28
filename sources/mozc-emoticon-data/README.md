@@ -32,3 +32,9 @@ Verify vendored files with:
 cd sources/mozc-emoticon-data
 shasum -a 256 -c source-inventory.sha256
 ```
+
+## 中文補充（資料層）
+
+- 資料層分類：相容性基底詞庫。
+- 選用理由：Mozc 提供乾淨、可再散布的 IME 顏文字資料，可替換舊資料中帶註解與雜訊的內容。
+- 在 release 的角色：提供 `顏文字` 預載分類來源；最終只輸出顏文字本體，不輸出日文讀音與說明欄位。

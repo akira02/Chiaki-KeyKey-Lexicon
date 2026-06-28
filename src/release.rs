@@ -268,6 +268,9 @@ fn write_source_inventories(
     paths: &ReleasePaths,
     libchewing_files: &[crate::types::LibchewingFile],
 ) -> Result<()> {
+    // Keep source inventories focused on vendored/pinned upstream inputs.
+    // Project-owned overlays/policies are maintained in git and do not need
+    // per-release source-inventory churn.
     let mut libchewing_paths = libchewing_files
         .iter()
         .map(|entry| entry.path.clone())
@@ -325,66 +328,7 @@ fn write_source_inventories(
         std::slice::from_ref(&paths.rime_essay_raw),
         true,
     )?;
-    write_inventory(
-        &paths.rime_conversion_inventory,
-        &paths.rime_conversion_source_dir,
-        std::slice::from_ref(&paths.rime_conversion_replacements),
-        true,
-    )?;
-    write_inventory(
-        &paths.overlay_inventory,
-        &paths.overlay_source_dir,
-        &[
-            paths.overlay_phrases.clone(),
-            paths.overlay_explicit.clone(),
-        ],
-        true,
-    )?;
-    write_inventory(
-        &paths.chiaki_web_overlay_inventory,
-        &paths.chiaki_web_overlay_source_dir,
-        &[
-            paths.chiaki_web_overlay_explicit.clone(),
-            paths.chiaki_web_overlay_bigrams.clone(),
-        ],
-        true,
-    )?;
-    write_inventory(
-        &paths.chiaki_synthetic_inventory,
-        &paths.chiaki_synthetic_source_dir,
-        &[
-            paths.chiaki_synthetic_unigrams.clone(),
-            paths.chiaki_synthetic_bigrams.clone(),
-        ],
-        true,
-    )?;
-    write_inventory(
-        &paths.chiakey_auto_hotwords_inventory,
-        &paths.chiakey_auto_hotwords_source_dir,
-        &[
-            paths.chiakey_auto_hotwords_phrases.clone(),
-            paths.chiakey_auto_hotwords_state.clone(),
-        ],
-        true,
-    )?;
-    write_inventory(
-        &paths.openformosa_common_voice_inventory,
-        &paths.openformosa_common_voice_source_dir,
-        std::slice::from_ref(&paths.openformosa_common_voice_bigrams),
-        true,
-    )?;
-    write_inventory(
-        &paths.opencc_variant_inventory,
-        &paths.opencc_variant_source_dir,
-        std::slice::from_ref(&paths.opencc_variant_demotions),
-        true,
-    )?;
-    write_inventory(
-        &paths.fragment_denylist_inventory,
-        &paths.fragment_denylist_source_dir,
-        std::slice::from_ref(&paths.fragment_demotions),
-        true,
-    )
+    Ok(())
 }
 
 fn import_libchewing(

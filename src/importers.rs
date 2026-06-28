@@ -1629,17 +1629,26 @@ mod tests {
     fn parses_conversion_rule_rows() {
         let path = temp_file(
             "rime-conversion-rules",
-            "# from\tto\ttags\n喫\t吃\trime-conversion,modern-zh-tw\n",
+            "# from\tto\ttags\n喫\t吃\trime-conversion,modern-zh-tw\n羣\t群\trime-conversion,modern-zh-tw\n裏面\t裡面\trime-conversion,modern-zh-tw,phrase-preference\n",
         );
 
         let (records, seen, skipped) = parse_conversion_rules(&path).unwrap();
 
-        assert_eq!(seen, 1);
+        assert_eq!(seen, 3);
         assert_eq!(skipped, 0);
-        assert_eq!(records.len(), 1);
+        assert_eq!(records.len(), 3);
         assert_eq!(records[0].from, "喫");
         assert_eq!(records[0].to, "吃");
         assert_eq!(records[0].tags, "rime-conversion,modern-zh-tw");
+        assert_eq!(records[1].from, "羣");
+        assert_eq!(records[1].to, "群");
+        assert_eq!(records[1].tags, "rime-conversion,modern-zh-tw");
+        assert_eq!(records[2].from, "裏面");
+        assert_eq!(records[2].to, "裡面");
+        assert_eq!(
+            records[2].tags,
+            "rime-conversion,modern-zh-tw,phrase-preference"
+        );
 
         let _ = fs::remove_file(path);
     }

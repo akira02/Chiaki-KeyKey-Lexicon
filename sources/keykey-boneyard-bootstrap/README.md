@@ -40,3 +40,9 @@ BONEYARD_DB=/path/to/KeyKeySource.db cargo run --release -- prepare-release
 - `dist/<version>/ChiaKeySource-<version>.json`
 - `dist/<version>/lexicon-manifest.json`
 - `dist/<version>/SHA256SUMS`
+
+## 中文補充（資料層）
+
+- 資料層分類：相容性基底詞庫。
+- 選用理由：ChiaKey 的 runtime 與資料庫 reader 建立在 KeyKey 既有資料形狀上，bootstrap DB 可保留既有 schema、metadata 與基本注音資料。
+- 在 release 的角色：作為 release DB 的初始基底，後續資料層都疊加在這份資料上。

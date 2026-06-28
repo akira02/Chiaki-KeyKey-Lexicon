@@ -19,3 +19,9 @@ The raw file is tracked in git. Its checksum is recorded in
 `source-inventory.sha256`.
 
 License: LGPL-3.0.
+
+## 中文補充（資料層）
+
+- 資料層分類：外部詞庫。
+- 選用理由：Rime essay 提供廣泛詞彙與語言模型分數，但缺少注音讀音，適合當補充與排序證據層。
+- 在 release 的角色：對既有弱詞做有限度 rerank，並僅在可安全推得讀音時匯入補充詞。

@@ -49,7 +49,7 @@ cargo run --release -- prepare-release
 
 這個 repository 以可重現的資料 pipeline 為核心：
 
-1. `sources/<source-id>/` 放每個已審查 input source、本地 README，以及 `source-inventory.sha256` provenance file。
+1. `sources/<source-id>/` 放每個已審查 input source 與本地 README；有 vendored/pinned upstream 檔案的 source 會另外附 `source-inventory.sha256` provenance file。
 2. `LICENSES/` 記錄每個可公開 release source 所需的 license text 或 license notes。
 3. `src/` 是 Rust release toolchain，負責驗證 inputs、將資料層匯入 KeyKey database shape、寫出 generated audit artifacts、更新 release metadata、產生 manifests。
 4. `normalized/smart-mandarin.tsv` 是 Smart Mandarin language-model rows 的 generated normalized audit view，不 commit。
@@ -63,28 +63,46 @@ cargo run --release -- prepare-release
 3. **Project-owned corrections**：小型 overlay，用來修已知輸入缺漏、指定讀音、調整候選排序。
 4. **Policy layers**：小型已審查規則，讓預設繁中 release 符合輸入法的語言與地區期待。
 
-## 目前資料來源
+## 資料層
 
-這個 repository 目前採用的資料來源分成「相容性基底」、「現代詞庫」、「補充 coverage」與「維護政策」幾層。每個 source 都有明確責任，release builder 會按固定順序整合，避免不同來源互相覆蓋到不可追蹤。
+這個 repository 的資料不是以「單一 source 清單」來看，而是分成四個資料層。release builder 會按固定順序疊加，避免互相覆蓋造成不可追蹤。
 
-| Source | 選用理由 | 負責工作 |
-| --- | --- | --- |
-| `keykey-boneyard-bootstrap` | ChiaKey 的 runtime 和 database reader 原本就建立在 KeyKey / Yahoo KeyKey 的資料形狀上；用 cooked bootstrap DB 可以保留既有 schema、metadata 與基本注音資料。 | 作為 release DB 的初始基底。builder 先複製這份 `KeyKeySource.db`，後續 sources 再疊加或替換資料。 |
-| `keykey-punctuations-cin` | 標點不是一般詞彙，但 Smart Mandarin runtime 會查 `_punctuation_*`、`_ctrl_*` 等 key；缺少時輸入法端會拒絕或得到空符號表。 | 從原始 `bpmf-punctuations.cin` 匯入 BPMF 標點與符號列表，寫入 `unigrams` 和 `Mandarin-bpmf-cin`。 |
-| `chiakey-symbols-overlay` | Yahoo 原始符號列表偏舊，缺少現代常用的貨幣、數學、圈號數字、勾叉、音樂與其他特殊符號；這些補充屬於 ChiaKey 自有維護資料。 | 只追加 `_punctuation_list` 候選，並跳過 Yahoo 原表已有符號，不改任何直接按鍵標點映射。 |
-| `keykey-prepopulated-service-data` | canned messages 仍是 ChiaKey 會讀取的預載資料，需要跟 release DB 一起提供，並帶正值 timestamp 才不會被 user DB 空資料蓋掉。 | 寫入 `prepopulated_service_data/canned_messages` 和 `canned_messages_timestamp`。builder 會把 supplemental symbol overlay 依類型追加成多個符號表分類，並以 Mozc 顏文字資料取代原本帶說明文字的內建 `顏文字` 列表。已移除不用的 OneKey service data。 |
-| `mozc-emoticon-data` | Mozc 是 Google Japanese Input 的開源版，提供乾淨、可再散布的日文 IME 顏文字資料。 | 供 canned messages 的 `顏文字` 分類使用。builder 只輸出顏文字本體，不把日文讀音或描述放進符號表列表。 |
-| `keykey-module-cin` | KeyKey runtime 不只讀 Smart Mandarin 詞庫，也可能讀其他 module tables；這些表不是主要注音詞庫，但缺少會造成相容性破洞。 | 匯入 `Generic-cj-cin`、`Generic-simplex-cin`、倉頡標點表與 `BopomofoCorrection-bopomofo-correction-cin`。 |
-| `libchewing-data` | libchewing-data 是活躍維護的繁中注音資料來源，包含明確注音讀音，比只靠舊 KeyKey bootstrap 推導更可靠。 | 作為主要現代詞庫層。`tsi.csv`、`alt.csv` 提供詞與替代讀音；`word.csv` 補單字讀音；單字頻率也用來修正常用字排序。 |
-| `bpmf-ext-cin` | libchewing 和 bootstrap 仍可能缺少單字候選；這份 public-domain CIN 表可以補足單字 coverage。 | 只補 CJK BMP 單字的缺失 `(reading, character)` pair，不覆蓋 libchewing 或 bootstrap 既有權重。 |
-| `rime-essay` | Rime essay 有較廣的現代詞彙與語言模型分數，但沒有注音讀音；適合當低優先補充與排序證據層，而不是主詞庫。 | 對既有弱詞做有限度 rerank；僅在詞尚未存在、分數達門檻、長度合理，且每個字都能從目前 DB 推得 primary reading 時匯入補充詞。 |
-| `chiakey-rime-conversion-policy` | Rime essay 的詞形有時不符合預設台灣現代繁中輸出期待，例如以 `喫` 表示常用的 `吃`。這類資料仍有頻率價值，不應只靠 modern overlay 補另一筆詞。 | 在 Rime supplemental import 與 Rime rerank 前套用小型 from/to 轉換規則，把 Rime 的頻率證據移到專案偏好的輸出詞形，例如 `喫壞` → `吃壞`。 |
-| `chiakey-modern-overlay` | 真實打字測試會發現少量立即需要修的缺漏或排序問題；這些修正應由專案自己維護，不能等大型來源更新。 | 補專案自有詞、指定明確 qstring，或針對已知 case 調整候選排序，例如 neutral-tone `ㄍㄜ˙` / `ek7`。 |
-| `chiaki-web-overlay` | 經人工審過的網路用語 overlay，僅作為 ChiaKey 詞庫的窄補充；其他專案或非 ChiaKey 用途預設應排除，除非自行完成來源審查。 | 匯入 explicit unigram 與 runtime bigram rows；只保存最終詞庫 rows，不保存原始語料。 |
-| `chiaki-synthetic-overlay` | Chiaki.C 維護的 synthetic 台灣網路用語 overlay。 | 匯入 unigram rows 與 runtime bigram probabilities；此來源採 CC BY-NC 4.0，商用請聯絡 Chiaki.C。 |
-| `openformosa-common-voice-25-zh-tw` | OpenFormosa / Mozilla Common Voice 的 CC0 zh-TW validated sentences。 | 匯入選出的 runtime bigram rows；不保存原始語音句庫。 |
-| `opencc-variant-policy` | 預設繁中輸入法不應讓簡體或非台灣慣用字因 tie-break 排在繁體字前面。OpenCC 可作為 variant knowledge 的參考，但不當作頻率詞典匯入。 | 用小型 policy table 降低指定 variant 的最大權重，例如讓 `个` 不會排在 `個` 前面。 |
-| `chiakey-fragment-denylist` | libchewing 收錄的非詞彙碎片（助動詞/情態詞+動詞，如 `會比`、`會在`）權重過高時，會偷走鄰詞的音節形成錯誤斷詞（如 `會比較準` 被切成 `會比\|校準`）。頻率與結構都無法把碎片和真詞分開。 | 用 phrase-level 上限把清單內碎片壓到 `w(lead)+w(stolen)−0.3` 的安全界（只降不升）。清單以結構過濾 → 教育部修訂本詞目比對 → 人工 spot-check 產出；教育部詞典僅為離線建表工具，不轉載其內容。 |
+### 相容性基底詞庫
+
+目標：維持 ChiaKey runtime、既有 schema 與模組表的相容性。
+
+- `keykey-boneyard-bootstrap`：release DB 初始基底（cooked `KeyKeySource.db`）。
+- `keykey-punctuations-cin`：BPMF 標點與 `_ctrl_*` 相容資料。
+- `keykey-module-cin`：`Generic-cj-cin`、`Generic-simplex-cin`、倉頡標點、`BopomofoCorrection-bopomofo-correction-cin`。
+- `keykey-prepopulated-service-data`：`canned_messages` 與 timestamp。
+- `mozc-emoticon-data`：補 `顏文字` 預載分類。
+
+### 外部詞庫
+
+目標：提供可審查、可再散布的外部詞彙與讀音覆蓋。
+
+- `libchewing-data`：主要現代繁中/注音詞庫層。
+- `bpmf-ext-cin`：補單字 `(reading, character)` coverage。
+- `rime-essay`：低優先補充詞與 rerank 證據層。
+
+### 專案詞庫
+
+目標：由專案維護、直接反映 ChiaKey 使用情境的詞庫資料。
+
+- `chiakey-modern-overlay`：專案自有修正詞與 explicit 讀音/排序調整。
+- `chiaki-web-overlay`：人工審核後的網路用語 unigram/bigram 補充。
+- `chiaki-synthetic-overlay`：Chiaki.C 維護的 synthetic unigram/bigram 補充。
+- `openformosa-common-voice-25-zh-tw`：從 Common Voice 句料挑選的 runtime bigram rows。
+- `chiakey-auto-hotwords-overlay`：自動刷新 hotwords overlay（僅保留專案輸出 rows）。
+- `chiakey-symbols-overlay`：補 `_punctuation_list` 缺漏符號。
+
+### 校正層
+
+目標：把外部證據轉成預設繁中（zh-TW）輸出期待，並抑制已知斷詞風險。
+
+- `chiakey-rime-conversion-policy`：Rime 詞形轉換規則（例如 `喫壞` → `吃壞`）。
+- `opencc-variant-policy`：variant 權重上限策略（避免簡體或非台灣慣用字前置）。
+- `chiakey-fragment-denylist`：句段碎片權重上限（降低偷字造成的錯誤斷詞）。
 
 另外，release builder 會從整合完成的 `unigrams` 派生 `associated_phrases` runtime table。這張表不是獨立詞源，而是提供「聯想詞提示」使用的 head-character -> phrase-tail 候選，例如輸出 `我` 後可提示 `們`、`的` 等詞尾。
 
@@ -92,7 +110,7 @@ cargo run --release -- prepare-release
 
 release builder 的整合流程是 deterministic 的：
 
-1. 先驗證每個必要 source file 存在，並為各 source 產生 `source-inventory.sha256`。
+1. 先驗證每個必要 source file 存在，並為有 vendored/pinned upstream 檔案的 source 產生 `source-inventory.sha256`。
 2. 複製 `keykey-boneyard-bootstrap` 的 cooked `KeyKeySource.db` 作為基底。
 3. 匯入 `libchewing-data`，以明確注音資料補強現代詞彙；libchewing phrase 會替換 bootstrap 中同詞的舊推導資料。
 4. 匯入 `bpmf-ext-cin`，只補缺少的單字讀音，不覆蓋既有資料。

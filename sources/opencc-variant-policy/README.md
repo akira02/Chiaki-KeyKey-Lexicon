@@ -27,3 +27,9 @@ Verify vendored files with:
 cd sources/opencc-variant-policy
 shasum -a 256 -c source-inventory.sha256
 ```
+
+## 中文補充（資料層）
+
+- 資料層分類：校正層。
+- 選用理由：預設繁中輸入不應因 tie-break 讓簡體或非台灣慣用 variant 排在前面。
+- 在 release 的角色：以 policy cap 降低指定 variant 的最大權重，讓候選排序更符合 zh-TW 預期。

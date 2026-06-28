@@ -19,3 +19,9 @@ Rules are applied to Rime phrase text only. Both sides must have the same
 character count so the inferred qstring stays aligned with the phrase.
 
 License: CC0-1.0.
+
+## 中文補充（資料層）
+
+- 資料層分類：校正層。
+- 選用理由：Rime 詞形常與預設台灣繁中輸出偏好不同，直接捨棄證據會浪費其頻率價值。
+- 在 release 的角色：在 Rime rerank 與補詞前先做 from/to 轉換，將頻率證據轉移到專案偏好詞形。

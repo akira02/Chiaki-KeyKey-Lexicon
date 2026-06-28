@@ -32,3 +32,9 @@ Verify vendored files with:
 cd sources/keykey-prepopulated-service-data
 shasum -a 256 -c source-inventory.sha256
 ```
+
+## 中文補充（資料層）
+
+- 資料層分類：相容性基底詞庫。
+- 選用理由：`canned_messages` 是 ChiaKey 仍會讀取的預載資料，且需要有效 timestamp 才不會被 user DB 空資料覆蓋。
+- 在 release 的角色：寫入 `prepopulated_service_data/canned_messages` 與 `canned_messages_timestamp`，並在 cooking 時套入符號補充與 Mozc 顏文字替換。

@@ -27,3 +27,9 @@ Verify vendored files with:
 cd sources/keykey-module-cin
 shasum -a 256 -c source-inventory.sha256
 ```
+
+## 中文補充（資料層）
+
+- 資料層分類：相容性基底詞庫。
+- 選用理由：KeyKey runtime 不只讀 Smart Mandarin 詞庫，也會使用其他 module tables；缺少會造成相容性破洞。
+- 在 release 的角色：匯入倉頡、簡體、標點與注音校正等 module CIN tables，但不參與 Smart Mandarin 候選排序。

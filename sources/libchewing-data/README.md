@@ -22,3 +22,9 @@ The raw files are tracked in git. Their checksums are recorded in
 `source-inventory.sha256`.
 
 License: LGPL-2.1-or-later, based on the source file `dc:license` headers and libchewing project license.
+
+## 中文補充（資料層）
+
+- 資料層分類：外部詞庫。
+- 選用理由：libchewing-data 為持續維護的繁中注音資料，含明確讀音，可靠度高於僅靠舊 bootstrap 推導。
+- 在 release 的角色：作為主要現代詞庫層；`tsi.csv`、`alt.csv` 提供詞與替代讀音，`word.csv` 補單字讀音與排序訊號。

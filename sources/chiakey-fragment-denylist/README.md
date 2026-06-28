@@ -32,3 +32,9 @@ Neither frequency nor structure alone separates fragments from real words; the
 combination (structure → dictionary → human spot-check) is what produced a clean
 set. See the dictionary licence note: MOE text is CC BY-ND 3.0 TW (no-derivatives
 applies to the text, not to downstream use); only this self-authored list ships.
+
+## 中文補充（資料層）
+
+- 資料層分類：校正層。
+- 選用理由：某些助動詞/情態詞碎片在詞庫中權重過高時，會偷走鄰詞音節造成錯誤斷詞。
+- 在 release 的角色：用 phrase-level 上限壓住碎片權重，降低錯誤切分風險，同時維持正常輸入可用性。

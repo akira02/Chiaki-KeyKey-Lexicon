@@ -28,3 +28,9 @@ The source inventory is stored at:
 ```text
 sources/bpmf-ext-cin/source-inventory.sha256
 ```
+
+## 中文補充（資料層）
+
+- 資料層分類：外部詞庫。
+- 選用理由：libchewing 與 bootstrap 仍可能缺少部分單字候選，這份 public-domain CIN 能補齊 coverage。
+- 在 release 的角色：只補缺失的單字 `(reading, character)` pair，不覆蓋既有資料權重。
