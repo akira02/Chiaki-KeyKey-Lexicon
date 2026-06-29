@@ -29,6 +29,8 @@ const RIME_OVERLAP_RERANK_MAX_BOOST: f64 = 0.35;
 const RIME_OVERLAP_RERANK_STRONG_GROUP_THRESHOLD: f64 = -0.75;
 const RIME_SPLIT_RERANK_MARGIN: f64 = 0.01;
 const RIME_SPLIT_RERANK_MAX_WEIGHT: f64 = RIME_OVERLAP_RERANK_STRONG_GROUP_THRESHOLD;
+const RIME_SPLIT_RERANK_MAX_BOOST: f64 = 0.35;
+const RIME_SPLIT_RERANK_MAX_GAP: f64 = 0.75;
 const RIME_EXISTING_RERANK_MAX_SPLIT_BOOST: f64 = 0.05;
 const SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN: f64 = 0.01;
 const SINGLE_CHAR_HOMOPHONE_RERANK_MAX_WEIGHT_GAP: f64 = 0.25;
@@ -1279,7 +1281,15 @@ fn rime_split_rerank_weight(
     }
 
     if best_split.is_finite() && best_split + RIME_SPLIT_RERANK_MARGIN > base_weight {
-        round6((best_split + RIME_SPLIT_RERANK_MARGIN).min(RIME_SPLIT_RERANK_MAX_WEIGHT))
+        if best_split - base_weight > RIME_SPLIT_RERANK_MAX_GAP {
+            base_weight
+        } else {
+            round6(
+                (best_split + RIME_SPLIT_RERANK_MARGIN)
+                    .min(base_weight + RIME_SPLIT_RERANK_MAX_BOOST)
+                    .min(RIME_SPLIT_RERANK_MAX_WEIGHT),
+            )
+        }
     } else {
         base_weight
     }
@@ -1296,9 +1306,10 @@ mod tests {
         libchewing_weight, parse_bigram_overlay, parse_conversion_rules, parse_explicit_overlay,
         parse_fragment_demotions, parse_rime_essay, parse_rime_existing_phrase_reranks,
         parse_rime_overlap_reranks, parse_single_char_homophone_reranks, parse_variant_demotions,
-        phrase_evidence_character_records, round6, RimeNormalization,
+        phrase_evidence_character_records, rime_split_rerank_weight, round6, RimeNormalization,
         LIBCHEWING_PHRASE_SEGMENT_BONUS, LIBCHEWING_PHRASE_SEGMENT_BONUS_THRESHOLD,
-        RIME_OVERLAP_RERANK_MARGIN, SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN,
+        RIME_OVERLAP_RERANK_MARGIN, RIME_SPLIT_RERANK_MAX_BOOST,
+        SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN,
     };
     use crate::config::{Config, CHIAKI_WEB_OVERLAY_SOURCE_ID};
     use crate::types::ConversionRule;
@@ -1623,7 +1634,7 @@ mod tests {
     }
 
     #[test]
-    fn reranks_rime_supplemental_phrase_above_existing_split_path() {
+    fn keeps_weak_rime_supplemental_phrase_below_existing_split_path() {
         let path = temp_file("rime-split-rerank", "趁現在\t280\n因爲\t474154\n");
         let cfg = test_config();
         let char_readings = HashMap::from([
@@ -1657,8 +1668,8 @@ mod tests {
 
         assert_eq!(seen, 2);
         assert_eq!(skipped, 0);
-        assert!(take_now.weight > -1.698951 + -0.265419);
-        assert_eq!(take_now.weight, -1.95437);
+        assert!(take_now.weight < -1.698951 + -0.265419);
+        assert_eq!(take_now.weight, -2.051873);
         assert_eq!(
             take_now.tags,
             "unigram,rime-essay,supplemental,split-rerank"
@@ -1668,7 +1679,7 @@ mod tests {
     }
 
     #[test]
-    fn lets_rime_split_rerank_escape_the_old_supplemental_floor() {
+    fn keeps_low_confidence_rime_split_rerank_on_original_scale() {
         let path = temp_file("rime-split-rerank-cap", "統計系統\t46\n因爲\t474154\n");
         let cfg = test_config();
         let char_readings = HashMap::from([
@@ -1700,14 +1711,24 @@ mod tests {
             .find(|record| record.phrase == "統計系統")
             .expect("統計系統 should be imported");
 
-        assert_eq!(statistics_system.weight, -0.797449);
-        assert!(statistics_system.weight > -1.35);
-        assert_eq!(
-            statistics_system.tags,
-            "unigram,rime-essay,supplemental,split-rerank"
-        );
+        assert_eq!(statistics_system.weight, -2.654999);
+        assert!(statistics_system.weight < -1.35);
+        assert_eq!(statistics_system.tags, "unigram,rime-essay,supplemental");
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn bounds_rime_split_rerank_without_flattening_rime_order() {
+        let qstring_weights =
+            HashMap::from([("nq".to_string(), -0.579543), ("0_".to_string(), -0.531528)]);
+
+        let strong = rime_split_rerank_weight(-1.80, "nq0_", 2, &qstring_weights);
+        let weak = rime_split_rerank_weight(-2.20, "nq0_", 2, &qstring_weights);
+
+        assert_eq!(strong, round6(-1.80 + RIME_SPLIT_RERANK_MAX_BOOST));
+        assert_eq!(weak, -2.20);
+        assert!(strong > weak);
     }
 
     #[test]
