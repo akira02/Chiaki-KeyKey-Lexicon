@@ -127,7 +127,7 @@ jobs:
       - name: Open pull request
         uses: peter-evans/create-pull-request@v8
         with:
-          branch: codex/auto-hotwords
+          branch: ci/auto-hotwords
           delete-branch: true
           commit-message: "chore(hotwords): refresh auto overlay"
           title: "chore(hotwords): refresh auto overlay"
