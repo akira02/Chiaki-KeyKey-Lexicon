@@ -27,6 +27,11 @@ const RIME_OVERLAP_RERANK_MARGIN: f64 = 0.01;
 const RIME_OVERLAP_RERANK_MAX_WEIGHT: f64 = -0.5;
 const RIME_OVERLAP_RERANK_MAX_BOOST: f64 = 0.35;
 const RIME_OVERLAP_RERANK_STRONG_GROUP_THRESHOLD: f64 = -0.75;
+// Raw rime-essay counts are noisy at this scale; require the higher-scoring
+// candidate to clear this ratio over the current floor before we let it
+// overtake, so near-tied counts (e.g. 599 vs 589) don't flip an order that
+// libchewing's own frequency gap already established more reliably.
+const RIME_OVERLAP_RERANK_MIN_SCORE_RATIO: f64 = 1.15;
 const RIME_SPLIT_RERANK_MARGIN: f64 = 0.01;
 const RIME_SPLIT_RERANK_MAX_WEIGHT: f64 = RIME_OVERLAP_RERANK_STRONG_GROUP_THRESHOLD;
 const RIME_SPLIT_RERANK_MAX_BOOST: f64 = 0.35;
@@ -424,8 +429,12 @@ pub fn parse_normalized_rime_overlap_reranks(
         });
 
         let mut floor = f64::NEG_INFINITY;
+        let mut floor_score: i64 = 0;
         for (phrase, current_weight, score) in group {
-            let minimum_weight = if floor.is_finite() {
+            let significant_gap = floor_score <= 0
+                || (score.score as f64)
+                    >= (floor_score as f64) * RIME_OVERLAP_RERANK_MIN_SCORE_RATIO;
+            let minimum_weight = if floor.is_finite() && significant_gap {
                 floor + RIME_OVERLAP_RERANK_MARGIN
             } else {
                 current_weight
@@ -447,6 +456,7 @@ pub fn parse_normalized_rime_overlap_reranks(
                 current_weight
             };
             floor = floor.max(applied_weight);
+            floor_score = floor_score.max(score.score);
         }
     }
 
@@ -1837,6 +1847,30 @@ mod tests {
         assert_eq!(records[0].phrase, "會選");
         assert_eq!(records[0].weight, -0.885961 + RIME_OVERLAP_RERANK_MARGIN);
         assert_eq!(records[0].tags, "unigram,rime-essay,overlap-rerank");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn does_not_overtake_when_rime_scores_are_nearly_tied() {
+        let path = temp_file("rime-overlap-near-tie", "同音\t589\n童音\t599\n");
+        let cfg = test_config();
+        let existing = vec![
+            ("abcd".to_string(), "同音".to_string(), -1.436913),
+            ("abcd".to_string(), "童音".to_string(), -2.876913),
+        ];
+        let conversion_rules = Vec::new();
+        let normalization = RimeNormalization::without_opencc(&conversion_rules);
+
+        let (records, seen, skipped) =
+            parse_rime_overlap_reranks(&path, &cfg, &existing, &normalization).unwrap();
+
+        assert_eq!(seen, 2);
+        assert_eq!(skipped, 0);
+        assert!(
+            records.is_empty(),
+            "a 1.7% rime-score gap should not overturn libchewing's much larger frequency gap"
+        );
 
         let _ = fs::remove_file(path);
     }
