@@ -2,7 +2,7 @@
 
 ## 來源代號
 
-`chiakey-rime-conversion-policy`
+`chiaki-rime-conversion-policy`
 
 ## 資料層
 
@@ -32,7 +32,11 @@ Rime 片語會先套 OpenCC `t2tw`，再套此檔案的例外規則。
 
 此層為專案自有政策資料。
 
-授權：CC0-1.0
+授權：CC BY-NC 4.0（Chiaki.C）
+
+非商業與開源專案可於標示來源為 Chiaki.C 前提下使用；商業用途需另行取得授權。
+
+授權全文見：`sources/chiaki-rime-conversion-policy/LICENSE`
 
 ## 驗證
 

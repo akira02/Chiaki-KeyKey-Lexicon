@@ -80,21 +80,20 @@
 
 ### 專案詞庫
 
-目標：由專案維護、直接反映 ChiaKey 使用情境的詞庫資料。
-
-- `chiakey-modern-overlay`：專案自有修正詞與 explicit 讀音/排序調整。
-- `chiakey-auto-hotwords-overlay`：自動刷新 hotwords overlay（僅保留專案輸出 rows）。
-- `chiakey-symbols-overlay`：補 `_punctuation_list` 缺漏符號與 runtime 標點候選。
-- `openformosa-common-voice-25-zh-tw`：從 Common Voice 句料挑選的 bigram rows。
-- `chiaki-web-overlay`：人工審核後的網路用語 unigram/bigram 補充。
+目標：由專案維護詞庫資料。
+- `chiaki-modern-overlay`：專案自有修正詞與 explicit 讀音/排序調整。
+- `chiaki-auto-hotwords-overlay`：自動刷新 hotwords overlay（僅保留專案輸出 rows）。
+- `chiaki-symbols-overlay`：補 `_punctuation_list` 缺漏符號與 runtime 標點候選。
+- `chiaki-web-overlay`：網路用語 unigram/bigram 補充。
 - `chiaki-synthetic-overlay`：合成語料提煉的 unigram/bigram 補充。
+- `openformosa-common-voice-25-zh-tw`：從 Common Voice 句料挑選的 bigram rows。
 
 ### 校正層
 
 目標：把外部證據轉成預設繁中（zh-TW）輸出期待，並抑制已知斷詞風險。
 
-- `chiakey-rime-conversion-policy`：OpenCC `t2tw` 後的 Rime 例外規則，只保留地名 `里`、食物詞 `里肌` 等 `t2tw` 無法安全判斷的專案偏好。
-- `chiakey-fragment-denylist`：句段碎片權重上限（降低偷字造成的錯誤斷詞）。
+- `chiaki-rime-conversion-policy`：OpenCC `t2tw` 後的 Rime 例外規則，只保留地名 `里`、食物詞 `里肌` 等 `t2tw` 無法安全判斷的專案偏好。
+- `chiaki-fragment-denylist`：句段碎片權重上限（降低偷字造成的錯誤斷詞）。
 
 
 ## 整合方式
@@ -105,13 +104,13 @@ Release builder 的整合流程是具有確定性的：
 2. 複製 `keykey-boneyard-bootstrap` 的 cooked `KeyKeySource.db` 作為基底。
 3. 匯入 `libchewing-data`，以明確注音資料補強現代詞彙；libchewing phrase 會替換 bootstrap 中同詞的舊推導資料。
 4. 匯入 `bpmf-ext-cin`，只補缺少的單字讀音，不覆蓋既有資料。
-5. 將 Rime essay phrase 批次套用 OpenCC `t2tw`，再讀取 `chiakey-rime-conversion-policy` 套用少量後處理例外；normalized 結果會在 Rime rerank 與 supplemental 匯入之間共用。
+5. 將 Rime essay phrase 批次套用 OpenCC `t2tw`，再讀取 `chiaki-rime-conversion-policy` 套用少量後處理例外；normalized 結果會在 Rime rerank 與 supplemental 匯入之間共用。
 6. 套用 `rime-essay` rerank：同音候選只允許有限幅度提升，既有弱詞可用 Rime 分數與切分證據有限度升權；單字同音群會在 Rime 單字頻率有足夠優勢時小幅重排；接著只加入目前 DB 尚無、且能安全推得注音的補充詞。
    - supplemental phrase 的 `split-rerank` 只作為保守輔助：若 Rime base 與最佳既有切分差距太大，不升權；若可升權，也只允許 bounded boost，避免像 `的`+`是` 這類高頻切分把整個同音 qstring（例如 `地市`、`的事`）拉平成同權重。
-7. 匯入 `chiakey-modern-overlay/phrases.tsv`，讓專案自有修正可以替換已知問題詞。
-8. 匯入 `chiakey-modern-overlay/explicit.tsv`，處理需要指定 qstring 或排序的精準修正。
+7. 匯入 `chiaki-modern-overlay/phrases.tsv`，讓專案自有修正可以替換已知問題詞。
+8. 匯入 `chiaki-modern-overlay/explicit.tsv`，處理需要指定 qstring 或排序的精準修正。
 9. 匯入 `chiaki-web-overlay/explicit.tsv` 與 `chiaki-synthetic-overlay/unigrams.tsv`。
-10. 由 OpenCC `t2tw` 產生同 qstring variant 權重上限，降低不符合預設繁中期待、且已有台灣標準 counterpart 的候選；再套用 `chiakey-fragment-denylist`，把偷字的非詞彙碎片壓到安全界。
+10. 由 OpenCC `t2tw` 產生同 qstring variant 權重上限，降低不符合預設繁中期待、且已有台灣標準 counterpart 的候選；再套用 `chiaki-fragment-denylist`，把偷字的非詞彙碎片壓到安全界。
 11. 匯入 `chiaki-synthetic-overlay/bigrams.tsv`、`openformosa-common-voice-25-zh-tw/bigrams.tsv`，再匯入 `chiaki-web-overlay/bigrams.tsv`，讓 reviewed web bigrams 可以覆蓋重疊的統計來源 rows。
 12. 補入 runtime compatibility data：BPMF 標點、ChiaKey supplemental symbol list、canned messages、Mozc 顏文字、module CIN tables。
 13. 從最終 `unigrams` 派生 `associated_phrases`，供聯想詞提示使用。
@@ -132,7 +131,7 @@ Rust release tooling 與 repository scripts 使用 MIT License；見 [LICENSE](L
 
 每個 source 都必須在公開 release 前宣告自己的 license。未知授權資料只能做本機實驗，不可包含在 public release artifacts。
 
-對於本專案製作的 `chiaki` 系列實驗性詞庫與清單，預設採用 CC BY-NC 4.0 授權條款釋出。
+對於本專案製作的 `chiaki` 系列實驗性詞庫與清單為開放資料集，預設採用 CC BY-NC 4.0 授權條款釋出。
 
 歡迎學術研究與個人非營利專案自由使用，使用時請標示原作者姓名。
 

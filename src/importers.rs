@@ -1554,7 +1554,7 @@ mod tests {
         // Unlike variant demotions (single-char only), fragment caps are 2+ chars.
         let path = temp_file(
             "fragment-demotions",
-            "# phrase\tmax_weight\ttags\n會比\t-1.80706\tchiakey-fragment-denylist,fragment-demote\n單\t-2.0\tchiakey-fragment-denylist,fragment-demote\n",
+            "# phrase\tmax_weight\ttags\n會比\t-1.80706\tchiaki-fragment-denylist,fragment-demote\n單\t-2.0\tchiaki-fragment-denylist,fragment-demote\n",
         );
 
         let (records, seen, skipped) = parse_fragment_demotions(&path).unwrap();
@@ -1566,7 +1566,7 @@ mod tests {
         assert_eq!(records[0].max_weight, -1.80706);
         assert_eq!(
             records[0].tags,
-            "unigram,chiakey-fragment-denylist,fragment-demote"
+            "unigram,chiaki-fragment-denylist,fragment-demote"
         );
 
         let _ = fs::remove_file(path);
