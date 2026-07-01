@@ -108,7 +108,7 @@ Rime essay phrase 進入 rerank 與 supplemental 匯入前，會先以 OpenCC `t
 
 首先，overlap rerank pass 會用 Rime scores 提升同一 KeyKey qstring group 內的既有候選。這個 pass 只會把較低排序的候選提升到足以尊重 Rime ordering，不會 demote 既有 rows，也會限制 promotion，避免 Rime 把 ambiguous candidate 推過既有高頻詞範圍。
 
-另有 single-character homophone rerank pass 會處理 libchewing 單字頻率對同音字近乎攤平的問題。它只在同一單字 qstring group 內比較 Rime essay 單字頻率，而且 Rime winner 與目前 top candidate 都必須有 Rime 單字頻率；預設 winner 至少要有 `5x` 頻率優勢，才會被小幅提升到目前 top 之上。這個 pass 只 raise，不 demote。
+另有 single-character homophone rerank pass 會處理 libchewing 單字頻率對同音字近乎攤平的問題。它只在同一單字 qstring group 內比較 Rime essay 單字頻率，而且候選與目前 top candidate 都必須有 Rime 單字頻率；預設候選至少要有 `2.5x` 頻率優勢，才會被小幅提升到目前 top 之上。若較高 Rime 頻率的候選沒有通過安全條件，pass 會繼續檢查下一個候選；當候選已有多個同 qstring 開頭的強 phrase rows 支援時，可用較低但仍保守的 Rime 頻率門檻處理 `量` / `ㄌㄧㄤˋ` 這類單字頻率錯置。這個 pass 只 raise，不 demote。
 
 接著，低優先補充詞 pass 會匯入符合以下條件的 entries：
 

@@ -39,6 +39,9 @@ const RIME_SPLIT_RERANK_MAX_GAP: f64 = 0.75;
 const RIME_EXISTING_RERANK_MAX_SPLIT_BOOST: f64 = 0.05;
 const SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN: f64 = 0.01;
 const SINGLE_CHAR_HOMOPHONE_RERANK_MAX_WEIGHT_GAP: f64 = 0.25;
+const SINGLE_CHAR_HOMOPHONE_RERANK_PHRASE_EVIDENCE_MIN_RATIO: f64 = 2.0;
+const SINGLE_CHAR_HOMOPHONE_RERANK_PHRASE_EVIDENCE_MIN_SUPPORT: usize = 3;
+const SINGLE_CHAR_HOMOPHONE_RERANK_PHRASE_EVIDENCE_MIN_WEIGHT: f64 = -1.35;
 const OPENCC_VARIANT_DEMOTION_MARGIN: f64 = 0.01;
 
 #[derive(Clone, Copy)]
@@ -272,8 +275,24 @@ pub fn parse_single_char_homophone_reranks(
     }
 
     let mut groups: HashMap<String, HashMap<String, f64>> = HashMap::new();
+    let mut phrase_evidence: HashMap<(String, String), (f64, usize)> = HashMap::new();
     for (qstring, phrase, weight) in existing_records {
         if phrase.chars().count() != 1 || qstring.chars().count() != 2 {
+            if phrase.chars().count() > 1 && qstring.chars().count() == phrase.chars().count() * 2 {
+                let head = phrase.chars().next().unwrap().to_string();
+                let head_qstring = qstring.chars().take(2).collect::<String>();
+                if *weight >= SINGLE_CHAR_HOMOPHONE_RERANK_PHRASE_EVIDENCE_MIN_WEIGHT {
+                    phrase_evidence
+                        .entry((head_qstring, head))
+                        .and_modify(|(best_weight, support_count)| {
+                            if *weight > *best_weight {
+                                *best_weight = *weight;
+                            }
+                            *support_count += 1;
+                        })
+                        .or_insert((*weight, 1));
+                }
+            }
             continue;
         }
         groups
@@ -296,48 +315,72 @@ pub fn parse_single_char_homophone_reranks(
             continue;
         }
         seen += 1;
-        let Some((winner, winner_freq)) = chars
+        let candidates = chars
             .keys()
             .filter_map(|character| essay_freq.get(character).map(|freq| (character, *freq)))
-            .max_by_key(|(_, freq)| *freq)
-        else {
+            .collect::<Vec<_>>();
+        if candidates.is_empty() {
             skipped += 1;
             continue;
         };
-        let winner_weight = chars.get(winner).copied().unwrap_or(f64::NEG_INFINITY);
-        let strongest_competitor = chars
-            .iter()
-            .filter(|(character, _weight)| *character != winner)
-            .max_by(|left, right| {
-                left.1
-                    .partial_cmp(right.1)
-                    .unwrap()
-                    .then_with(|| left.0.cmp(right.0))
-            });
-        let Some((competitor, competitor_weight)) = strongest_competitor else {
-            skipped += 1;
-            continue;
-        };
-        if winner_weight > *competitor_weight {
-            skipped += 1;
-            continue;
-        };
-        if *competitor_weight - winner_weight > SINGLE_CHAR_HOMOPHONE_RERANK_MAX_WEIGHT_GAP {
-            skipped += 1;
-            continue;
+
+        let mut candidates = candidates;
+        candidates.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(right.0)));
+
+        let mut selected = None;
+        for (winner, winner_freq) in candidates {
+            let winner_weight = chars.get(winner).copied().unwrap_or(f64::NEG_INFINITY);
+            let strongest_competitor = chars
+                .iter()
+                .filter(|(character, _weight)| *character != winner)
+                .max_by(|left, right| {
+                    left.1
+                        .partial_cmp(right.1)
+                        .unwrap()
+                        .then_with(|| left.0.cmp(right.0))
+                });
+            let Some((competitor, competitor_weight)) = strongest_competitor else {
+                continue;
+            };
+            if winner_weight > *competitor_weight {
+                continue;
+            };
+            let has_strong_phrase_evidence = phrase_evidence
+                .get(&(qstring.clone(), winner.clone()))
+                .is_some_and(|(_best_weight, support_count)| {
+                    *support_count >= SINGLE_CHAR_HOMOPHONE_RERANK_PHRASE_EVIDENCE_MIN_SUPPORT
+                });
+            if !has_strong_phrase_evidence
+                && *competitor_weight - winner_weight > SINGLE_CHAR_HOMOPHONE_RERANK_MAX_WEIGHT_GAP
+            {
+                continue;
+            }
+            let Some(competitor_freq) = essay_freq.get(competitor).copied() else {
+                continue;
+            };
+            let required_ratio = if has_strong_phrase_evidence {
+                min_ratio.min(SINGLE_CHAR_HOMOPHONE_RERANK_PHRASE_EVIDENCE_MIN_RATIO)
+            } else {
+                min_ratio
+            };
+            if (winner_freq as f64) < required_ratio * (competitor_freq as f64) {
+                continue;
+            }
+            selected = Some((
+                winner.clone(),
+                round6(*competitor_weight + SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN),
+            ));
+            break;
         }
-        let Some(competitor_freq) = essay_freq.get(competitor).copied() else {
+
+        let Some((winner, weight)) = selected else {
             skipped += 1;
             continue;
         };
-        if (winner_freq as f64) < min_ratio * (competitor_freq as f64) {
-            skipped += 1;
-            continue;
-        }
         records.push(SourceRecord {
             qstring: qstring.clone(),
             phrase: winner.clone(),
-            weight: round6(competitor_weight + SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN),
+            weight,
             source_id: RIME_ESSAY_SOURCE_ID,
             tags: format!("unigram,{RIME_ESSAY_SOURCE_ID},homophone-rerank"),
         });
@@ -2096,6 +2139,39 @@ mod tests {
         assert_eq!(
             records[0].weight,
             round6(-0.902038 + SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN)
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn reranks_weak_character_reading_with_strong_phrase_evidence() {
+        let path = temp_file(
+            "single-char-homophone-rerank-phrase-evidence",
+            "兩\t17606\n量\t12025\n亮\t5238\n輛\t2649\n晾\t1078\n諒\t773\n",
+        );
+        let existing = vec![
+            ("Qk".to_string(), "亮".to_string(), -1.091185),
+            ("Qk".to_string(), "晾".to_string(), -1.091200),
+            ("Qk".to_string(), "輛".to_string(), -1.091200),
+            ("Qk".to_string(), "兩".to_string(), -3.094452),
+            ("Qk".to_string(), "量".to_string(), -3.094452),
+            ("QkQY".to_string(), "量產".to_string(), -0.843159),
+            ("QkRO".to_string(), "量子".to_string(), -1.128131),
+            ("Qk_`".to_string(), "量化".to_string(), -1.076113),
+        ];
+
+        let (records, seen, skipped) =
+            parse_single_char_homophone_reranks(&path, &existing, 2.5).unwrap();
+
+        assert_eq!(seen, 1);
+        assert_eq!(skipped, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].qstring, "Qk");
+        assert_eq!(records[0].phrase, "量");
+        assert_eq!(
+            records[0].weight,
+            round6(-1.091185 + SINGLE_CHAR_HOMOPHONE_RERANK_MARGIN)
         );
 
         let _ = fs::remove_file(path);
