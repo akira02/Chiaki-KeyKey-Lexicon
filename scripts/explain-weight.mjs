@@ -149,14 +149,26 @@ function scanBoneyardDb(words) {
 async function scanNormalized(words) {
   // matches: word -> [{ qstring, phrase, weight, sourceId, tags }]
   const matches = new Map(words.map((w) => [w, []]));
+  // bestByQstring: qstring -> strongest unigram candidate, used to explain
+  // why a whole phrase can lose to a split path.
+  const bestByQstring = new Map();
   // homophoneGroups: qstring -> [{ phrase, weight, sourceId, tags }] for any
   // qstring that at least one target word matched, so we can show the full
   // ranking context (useful for the "why is A above B" question).
   const wantedQstrings = new Set();
   await forEachLine(NORMALIZED_PATH, (line) => {
     const [qstring, phrase, weight, sourceId, tags] = line.split("\t");
+    const entry = { qstring, phrase, weight: Number(weight), sourceId, tags };
+    const best = bestByQstring.get(qstring);
+    if (
+      !best ||
+      entry.weight > best.weight ||
+      (entry.weight === best.weight && entry.phrase.localeCompare(best.phrase, "zh-Hant") < 0)
+    ) {
+      bestByQstring.set(qstring, entry);
+    }
     if (matches.has(phrase)) {
-      matches.get(phrase).push({ qstring, phrase, weight, sourceId, tags });
+      matches.get(phrase).push(entry);
       wantedQstrings.add(qstring);
     }
   });
@@ -172,7 +184,35 @@ async function scanNormalized(words) {
     group.sort((a, b) => b.weight - a.weight);
   }
 
-  return { matches, groups };
+  return { matches, groups, bestByQstring };
+}
+
+function bestSplit(row, bestByQstring) {
+  const syllables = row.qstring.length / 2;
+  if (!Number.isInteger(syllables) || syllables < 2) return null;
+
+  let best = null;
+  for (let splitSyllable = 1; splitSyllable < syllables; splitSyllable += 1) {
+    const splitAt = splitSyllable * 2;
+    const prefix = row.qstring.slice(0, splitAt);
+    const suffix = row.qstring.slice(splitAt);
+    const left = bestByQstring.get(prefix);
+    const right = bestByQstring.get(suffix);
+    if (!left || !right) continue;
+    const weight = left.weight + right.weight;
+    if (
+      !best ||
+      weight > best.weight ||
+      (weight === best.weight &&
+        `${left.phrase}${right.phrase}`.localeCompare(
+          `${best.left.phrase}${best.right.phrase}`,
+          "zh-Hant",
+        ) < 0)
+    ) {
+      best = { left, right, weight };
+    }
+  }
+  return best;
 }
 
 async function main() {
@@ -194,7 +234,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { matches, groups } = await scanNormalized(words);
+  const { matches, groups, bestByQstring } = await scanNormalized(words);
   const rawHitsBySource = await Promise.all(
     RAW_SOURCES.map((source) => scanRawSource(source, words)),
   );
@@ -211,6 +251,13 @@ async function main() {
       console.log(
         `  final: qstring=${row.qstring} weight=${row.weight} source=${row.sourceId} tags=${row.tags}`,
       );
+      const split = bestSplit(row, bestByQstring);
+      if (split) {
+        const delta = row.weight - split.weight;
+        console.log(
+          `  best split: ${split.left.phrase}+${split.right.phrase} weight=${split.weight.toFixed(6)} delta=${delta.toFixed(6)}`,
+        );
+      }
     }
 
     console.log("  raw sources:");

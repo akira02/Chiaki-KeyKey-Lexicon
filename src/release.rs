@@ -127,14 +127,15 @@ pub fn run() -> Result<()> {
         &mut source_keys,
         &mut import_results,
     )?;
-    import_fragment_demotions(
+    import_single_char_homophone_rerank(
         &mut conn,
         &cfg,
         &paths,
         &mut source_keys,
         &mut import_results,
     )?;
-    import_single_char_homophone_rerank(
+    import_phrase_split_rerank(&mut conn, &mut source_keys, &mut import_results)?;
+    import_fragment_demotions(
         &mut conn,
         &cfg,
         &paths,
@@ -166,6 +167,7 @@ pub fn run() -> Result<()> {
     )?;
     import_prepopulated_service_data(&mut conn, &cfg, &paths, &mut import_results)?;
     import_module_cin_tables(&mut conn, &cfg, &paths, &mut import_results)?;
+    db::reorder_mandarin_bpmf_candidates(&mut conn)?;
     import_associated_phrases(&mut conn, &mut import_results)?;
 
     db::refresh_metadata_counts(&conn)?;
@@ -857,6 +859,40 @@ fn import_fragment_demotions(
         seen,
         skipped,
         config::FRAGMENT_DENYLIST_SOURCE_ID,
+    )?;
+    remember_records(source_keys, &result);
+    import_results.push(result);
+    Ok(())
+}
+
+fn import_phrase_split_rerank(
+    conn: &mut Connection,
+    source_keys: &mut HashMap<(String, String), SourceRecord>,
+    import_results: &mut Vec<ImportResult>,
+) -> Result<()> {
+    let existing_records = db::load_existing_phrase_weights(conn)?;
+    let existing_qstring_weights = db::load_best_qstring_weights(conn)?;
+    let records =
+        importers::phrase_split_rerank_records(&existing_records, &existing_qstring_weights);
+    let seen = existing_records.len();
+    let skipped = seen.saturating_sub(records.len());
+    let source_path = "generated/phrase-split-rerank#from-unigrams";
+    let source_sha256 = sha256_bytes(
+        format!(
+            "phrase-split-rerank\nseen={seen}\nadded={}\n",
+            records.len()
+        )
+        .as_bytes(),
+    );
+    let result = db::apply_records(
+        conn,
+        records,
+        source_path,
+        "generated-phrase-split-rerank",
+        &source_sha256,
+        seen,
+        skipped,
+        false,
     )?;
     remember_records(source_keys, &result);
     import_results.push(result);
