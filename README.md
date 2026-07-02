@@ -107,7 +107,7 @@ Release builder 的整合流程是具有確定性的：
    - supplemental phrase 的 `split-rerank` 只作為保守輔助：若 Rime base 與最佳既有切分差距太大，不升權；若可升權，也只允許 bounded boost，避免像 `的`+`是` 這類高頻切分把整個同音 qstring（例如 `地市`、`的事`）拉平成同權重。
 7. 匯入 `chiaki-modern-overlay/phrases.tsv`，讓專案自有修正可以替換已知問題詞。
 8. 匯入 `chiaki-modern-overlay/explicit.tsv`，處理需要指定 qstring 或排序的精準修正。
-9. 匯入 `chiaki-web-overlay/explicit.tsv` 與 `chiaki-synthetic-overlay/unigrams.tsv`。
+9. 匯入 `chiaki-web-overlay/unigrams.tsv` 與 `chiaki-synthetic-overlay/unigrams.tsv`。
 10. 由 OpenCC `t2tw` 產生同 qstring variant 權重上限，降低不符合預設繁中期待、且已有台灣標準 counterpart 的候選；再套用 `chiaki-fragment-denylist`，把偷字的非詞彙碎片壓到安全界。
 11. 匯入 `chiaki-synthetic-overlay/bigrams.tsv`、`openformosa-common-voice-25-zh-tw/bigrams.tsv`，再匯入 `chiaki-web-overlay/bigrams.tsv`，讓 reviewed web bigrams 可以覆蓋重疊的統計來源 rows。
 12. 補入 runtime compatibility data：BPMF 標點、ChiaKey supplemental symbol list、canned messages、Mozc 顏文字、module CIN tables。

@@ -227,7 +227,7 @@ fn verify_inputs(
         paths.bpmf_ext_cin.clone(),
         paths.overlay_phrases.clone(),
         paths.overlay_explicit.clone(),
-        paths.chiaki_web_overlay_explicit.clone(),
+        paths.chiaki_web_overlay_unigrams.clone(),
         paths.chiaki_web_overlay_bigrams.clone(),
         paths.chiaki_synthetic_unigrams.clone(),
         paths.chiaki_synthetic_bigrams.clone(),
@@ -894,13 +894,13 @@ fn import_chiaki_web_overlay(
     import_results: &mut Vec<ImportResult>,
 ) -> Result<()> {
     let (records, seen, skipped) =
-        importers::parse_chiaki_web_overlay(&paths.chiaki_web_overlay_explicit, cfg)?;
+        importers::parse_chiaki_web_overlay(&paths.chiaki_web_overlay_unigrams, cfg)?;
     let result = db::apply_records(
         conn,
         records,
-        &repo_relative(&cfg.root, &paths.chiaki_web_overlay_explicit)?,
-        "chiaki-web-explicit-qstring",
-        &sha256_file(&paths.chiaki_web_overlay_explicit)?,
+        &repo_relative(&cfg.root, &paths.chiaki_web_overlay_unigrams)?,
+        "chiaki-web-unigram",
+        &sha256_file(&paths.chiaki_web_overlay_unigrams)?,
         seen,
         skipped,
         false,

@@ -325,7 +325,7 @@ sources/mozc-emoticon-data/source-inventory.sha256
 
 - 名稱：Chiaki reviewed web corpus overlay
 - 本地來源：
-  - `sources/chiaki-web-overlay/explicit.tsv`
+  - `sources/chiaki-web-overlay/unigrams.tsv`
   - `sources/chiaki-web-overlay/bigrams.tsv`
 - 來源材料：經審查的 web-derived 台灣網路用語材料
 - 授權：CC BY-NC 4.0；商用需取得 Chiaki.C 許可

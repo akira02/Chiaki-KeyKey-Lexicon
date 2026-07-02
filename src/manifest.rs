@@ -136,7 +136,7 @@ pub fn release_metadata(
             "CC BY-NC 4.0; commercial use requires permission from Chiaki.C",
             "Chiaki.C",
             &paths.chiaki_web_overlay_source_dir,
-            &[&paths.chiaki_web_overlay_explicit, &paths.chiaki_web_overlay_bigrams],
+            &[&paths.chiaki_web_overlay_unigrams, &paths.chiaki_web_overlay_bigrams],
             db::stats_for_source_rows(source_rows, "sources/chiaki-web-overlay/"),
         )?,
         release_source_from_files(
@@ -333,7 +333,7 @@ pub fn manifest(
             "CC BY-NC 4.0; commercial use requires permission from Chiaki.C",
             "Chiaki.C",
             &paths.chiaki_web_overlay_source_dir,
-            &[&paths.chiaki_web_overlay_explicit, &paths.chiaki_web_overlay_bigrams],
+            &[&paths.chiaki_web_overlay_unigrams, &paths.chiaki_web_overlay_bigrams],
             305,
         )?,
         manifest_source_from_files(
